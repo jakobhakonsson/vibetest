@@ -1,0 +1,86 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node.js Documentation Viewer</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .search { margin-bottom: 20px; }
+        #searchInput { width: 300px; padding: 8px; }
+        .module { margin-bottom: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+        .module h3 { margin-top: 0; color: #333; }
+        .method { margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 3px; }
+        .method h4 { margin: 0 0 5px 0; color: #666; }
+        .description { color: #555; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Node.js Documentation Viewer</h1>
+        <div class="search">
+            <input type="text" id="searchInput" placeholder="Search modules and methods...">
+        </div>
+        <div id="content"></div>
+    </div>
+    
+    <script>
+        fetch('./all.json')
+            .then(response => response.json())
+            .then(data => {
+                const content = document.getElementById('content');
+                const searchInput = document.getElementById('searchInput');
+                
+                function renderModules(modules) {
+                    content.innerHTML = '';
+                    Object.keys(modules).forEach(moduleName => {
+                        const module = modules[moduleName];
+                        const moduleDiv = document.createElement('div');
+                        moduleDiv.className = 'module';
+                        moduleDiv.innerHTML = `
+                            <h3>${moduleName}</h3>
+                            <div class="description">${module.description || 'No description available'}</div>
+                        `;
+                        
+                        if (module.methods) {
+                            Object.keys(module.methods).forEach(methodName => {
+                                const method = module.methods[methodName];
+                                const methodDiv = document.createElement('div');
+                                methodDiv.className = 'method';
+                                methodDiv.innerHTML = `
+                                    <h4>${methodName}</h4>
+                                    <div class="description">${method.description || 'No description available'}</div>
+                                `;
+                                moduleDiv.appendChild(methodDiv);
+                            });
+                        }
+                        
+                        content.appendChild(moduleDiv);
+                    });
+                }
+                
+                renderModules(data);
+                
+                searchInput.addEventListener('input', (e) => {
+                    const searchTerm = e.target.value.toLowerCase();
+                    const filteredModules = {};
+                    
+                    Object.keys(data).forEach(moduleName => {
+                        const module = data[moduleName];
+                        if (moduleName.toLowerCase().includes(searchTerm) || 
+                            (module.description && module.description.toLowerCase().includes(searchTerm))) {
+                            filteredModules[moduleName] = module;
+                        }
+                    });
+                    
+                    renderModules(filteredModules);
+                });
+            })
+            .catch(error => {
+                document.getElementById('content').innerHTML = '<p>Error loading documentation: ' + error.message + '</p>';
+            });
+    </script>
+</body>
+</html>
