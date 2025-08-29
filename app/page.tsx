@@ -66,6 +66,22 @@ const CheckmarkIcon = () => (
   </svg>
 );
 
+// Replace FunStatsIcon with a more beautiful beer mug icon
+const FunStatsIcon = () => (
+  <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="8" y="12" width="16" height="16" rx="4" fill="#FBBF24" stroke="#B45309" strokeWidth="2"/>
+    <rect x="24" y="16" width="4" height="10" rx="2" fill="#FDE68A" stroke="#F59E42" strokeWidth="1.5"/>
+    <ellipse cx="16" cy="12" rx="8" ry="4" fill="#FEF3C7"/>
+    <ellipse cx="16" cy="12" rx="6" ry="3" fill="#FFF" opacity="0.8"/>
+    <circle cx="12" cy="10" r="1.2" fill="#FFF"/>
+    <circle cx="20" cy="10.5" r="1" fill="#FFF"/>
+    <path d="M28 20c2 0 2 6 0 6" stroke="#F59E42" strokeWidth="1.5" strokeLinecap="round"/>
+    <g>
+      <path d="M30 6l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2z" fill="#FDE68A" stroke="#FBBF24" strokeWidth="0.7"/>
+    </g>
+  </svg>
+);
+
 // Move StatusBadge and Bar above Home so they are in scope
 const StatusBadge = ({ status }: { status: string }) => (
   <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${
@@ -86,6 +102,16 @@ const Bar = ({ value, max, color }: { value: number; max: number; color: string 
   <div className="w-full h-2 bg-gray-200 rounded">
     <div
       className={color + " h-2 rounded"}
+      style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
+    ></div>
+  </div>
+);
+
+// Compact bar variant for tighter UI
+const SmallBar = ({ value, max, color }: { value: number; max: number; color: string }) => (
+  <div className="w-full h-1 bg-gray-200 rounded">
+    <div
+      className={color + " h-1 rounded"}
       style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
     ></div>
   </div>
@@ -114,6 +140,10 @@ export default function Home() {
     averageScorePour4?: number;
     averageScorePour5?: number;
     averageTotal?: number;
+    // Beer types specific
+    customersServed?: number;
+    correctBeersServed?: number;
+    beerTypesScore?: number;
   };
   // Move mock data generation here so it runs on every reload
   const [sessions] = useState(() => Array.from({ length: 120 }, (_, i) => {
@@ -135,41 +165,76 @@ export default function Home() {
     };
   }));
 
-  const moduleTypesList = ["Perfect Pour", "Ingredients", "Beer types"];
-  const [modules] = useState<ModuleType[]>(() => Array.from({ length: 120 }, (_, i) => {
-    const id = `module-${(i + 1).toString().padStart(3, '0')}`;
-    const moduleId = moduleTypesList[i % moduleTypesList.length];
-    const sessionId = `session-${(i + 1).toString().padStart(3, '0')}`;
-    const start = new Date(Date.now() - (120 - i) * 60 * 60 * 1000 + getRandomInt(0, 30) * 60 * 1000);
-    const duration = getRandomInt(3, 10) + getRandomInt(0, 59) / 60;
-    const end = new Date(start.getTime() + duration * 60 * 1000);
-    const status = duration < 5 ? "exited" : "completed";
-    const base: ModuleType = {
-      id,
-      moduleId,
-      sessionId,
-      startTime: start.toISOString(),
-      endTime: end.toISOString(),
-      duration,
-      status
-    };
-    if (moduleId === "Perfect Pour") {
-      let p1 = getRandomInt(1000, 6000);
-      let p2 = p1 + getRandomInt(1000, 6000);
-      let p3 = p2 + getRandomInt(1000, 6000);
-      let p4 = p3 + getRandomInt(1000, 6000);
-      let p5 = p4 + getRandomInt(1000, 6000);
-      base.averageScorePour1 = p1;
-      base.averageScorePour2 = p2;
-      base.averageScorePour3 = p3;
-      base.averageScorePour4 = p4;
-      base.averageScorePour5 = p5;
-      base.averageScorePerBeer = Math.round((p1 + p2 + p3 + p4 + p5) / 5);
-      base.challengeHighScore = status === "exited" ? null : getRandomInt(p5, p5 + 50000);
-      base.averageTotal = Math.round((p1 + p2 + p3 + p4 + p5) / 5);
-    }
-    return base;
-  }));
+  const moduleTypesList = [
+    "Tutorial",
+    "Perfect Pour - The basics",
+    "Perfect Pour - Masterclass",
+    "Ingredients",
+    "Beer types"
+  ];
+  const [modules] = useState<ModuleType[]>(() => {
+    const generated: ModuleType[] = [];
+    let moduleCounter = 1;
+    sessions.forEach((s) => {
+      // Pick a random number of module plays for this session (allow repeats)
+      const numModulePlays = getRandomInt(1, moduleTypesList.length);
+      let rollingOffsetMinutes = getRandomInt(0, 15);
+      for (let k = 0; k < numModulePlays; k++) {
+        const moduleId = moduleTypesList[getRandomInt(0, moduleTypesList.length - 1)];
+        const id = `module-${(moduleCounter++).toString().padStart(3, '0')}`;
+        const sessionId = s.id;
+        const sessionStart = new Date(s.startTime);
+        const start = new Date(sessionStart.getTime() + rollingOffsetMinutes * 60 * 1000);
+        // Duration rules (Ingredients <= 5 min, others 3-10 min) with seconds
+        let minutes: number;
+        let seconds: number;
+        if (moduleId === "Ingredients") {
+          minutes = getRandomInt(0, 5);
+          seconds = minutes === 5 ? 0 : getRandomInt(0, 59);
+        } else {
+          minutes = getRandomInt(3, 10);
+          seconds = minutes === 10 ? 0 : getRandomInt(0, 59);
+        }
+        const duration = minutes + seconds / 60;
+        const end = new Date(start.getTime() + duration * 60 * 1000);
+        const status = duration < 5 ? "exited" : "completed";
+        const base: ModuleType = {
+          id,
+          moduleId,
+          sessionId,
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
+          duration,
+          status
+        };
+        if (moduleId === "Perfect Pour - The basics" || moduleId === "Perfect Pour - Masterclass") {
+          let p1 = getRandomInt(1000, 6000);
+          let p2 = p1 + getRandomInt(1000, 6000);
+          let p3 = p2 + getRandomInt(1000, 6000);
+          let p4 = p3 + getRandomInt(1000, 6000);
+          let p5 = p4 + getRandomInt(1000, 6000);
+          base.averageScorePour1 = p1;
+          base.averageScorePour2 = p2;
+          base.averageScorePour3 = p3;
+          base.averageScorePour4 = p4;
+          base.averageScorePour5 = p5;
+          base.averageScorePerBeer = Math.round((p1 + p2 + p3 + p4 + p5) / 5);
+          base.challengeHighScore = status === "exited" ? null : getRandomInt(p5, p5 + 50000);
+          base.averageTotal = Math.round((p1 + p2 + p3 + p4 + p5) / 5);
+        }
+        if (moduleId === "Beer types") {
+          const customers = getRandomInt(5, 30);
+          base.customersServed = customers;
+          base.correctBeersServed = getRandomInt(0, customers);
+          base.beerTypesScore = getRandomInt(0, 150000);
+        }
+        generated.push(base);
+        // Advance rolling offset to stagger module starts within session
+        rollingOffsetMinutes += Math.max(1, Math.floor(minutes / 2));
+      }
+    });
+    return generated;
+  });
 
   // Generate mock total sessions between 100-200
   const [totalSessions] = useState(() => getRandomInt(100, 200));
@@ -183,10 +248,24 @@ export default function Home() {
   const exitedModulesPlayed = modulesPlayedSplit[1];
   const [selectedTimeframe, setSelectedTimeframe] = useState("24h");
   const [showAllSessions, setShowAllSessions] = useState(false);
-  const [showAllModules, setShowAllModules] = useState(false);
-  const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
+  const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
+  // Module rows show drilldown by default; no per-row toggle needed
   const [isLoading, setIsLoading] = useState(false);
   const [showAIResponse, setShowAIResponse] = useState(false);
+
+  // Generate mock fun stats for glasses broken and beer spilled
+  const [funStats] = useState(() => ({
+    glassesBroken: getRandomInt(0, 8),
+    beerSpilled: getRandomInt(0, 12)
+  }));
+
+  // Additional fun facts metrics
+  const [funFacts] = useState(() => {
+    const virtualBeersPoured = getRandomInt(500, 2000);
+    const beersServed = getRandomInt(400, virtualBeersPoured);
+    const glassesTouchingTap = getRandomInt(10, 120);
+    return { virtualBeersPoured, beersServed, glassesTouchingTap };
+  });
 
   // Metrics
   const avgSessionDuration = sessions.reduce((acc, s) => acc + s.duration, 0) / sessions.length;
@@ -196,17 +275,26 @@ export default function Home() {
 
   // Drilldown per module type
   const moduleTypes = Array.from(new Set(modules.map(m => m.moduleId)));
-  const moduleStats = moduleTypes.map(type => {
+  // Generate once per page load so expanding/collapsing sessions won't change these numbers
+  const [moduleStats] = useState(() => moduleTypes.map(type => {
     const started = getRandomInt(100, 200);
     const completed = getRandomInt(0, started);
     const exited = started - completed;
-    const avgDuration = getRandomInt(3, 10) + getRandomInt(0, 59) / 60;
+    // Avg duration: cap Ingredients at <= 5 minutes
+    const avgDuration = type === "Ingredients"
+      ? (getRandomInt(0, 5) + (getRandomInt(0, 5) === 5 ? 0 : getRandomInt(0, 59)) / 60)
+      : (getRandomInt(3, 10) + getRandomInt(0, 59) / 60);
     return { type, started, exited, completed, avgDuration };
-  });
+  }));
 
   // Format time
   const formatTime = (timeString: string) => {
     return new Date(timeString).toLocaleString();
+  };
+
+  // Format time as HH:MM (24-hour)
+  const formatTimeHM = (timeString: string) => {
+    return new Date(timeString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
   // Format duration
@@ -216,6 +304,11 @@ export default function Home() {
     return `${mins}m ${secs}s`;
   };
 
+  // Format time as HH:MM:SS (24-hour)
+  const formatTimeHMS = (timeString: string) => {
+    return new Date(timeString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  };
+
   // In Session Activity, sort sessions by descending session number (most recent first)
   const sortedSessions = [...sessions].sort((a, b) => {
     // Extract the numeric part from the session id (e.g., 'session-120' -> 120)
@@ -223,6 +316,29 @@ export default function Home() {
     const numB = parseInt(b.id.replace('session-', ''), 10);
     return numB - numA;
   });
+
+  // Pie chart helpers for the right big card
+  const pieColors = ["#60A5FA", "#34D399", "#FBBF24", "#A78BFA", "#F472B6"]; // blue, green, amber, purple, pink
+  const toRadians = (deg: number) => (deg * Math.PI) / 180;
+  const describeArc = (cx: number, cy: number, r: number, startAngle: number, endAngle: number) => {
+    const start = { x: cx + r * Math.cos(toRadians(startAngle)), y: cy + r * Math.sin(toRadians(startAngle)) };
+    const end = { x: cx + r * Math.cos(toRadians(endAngle)), y: cy + r * Math.sin(toRadians(endAngle)) };
+    const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
+    return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y} Z`;
+  };
+
+  // Build stable module breakdown (once) and derive pie data
+  const [moduleBreakdown] = useState(() => moduleTypes.map((type, idx) => {
+    const started = getRandomInt(100, 200);
+    const completed = getRandomInt(0, started);
+    const avgDuration = type === "Ingredients"
+      ? (getRandomInt(0, 5) + (getRandomInt(0, 5) === 5 ? 0 : getRandomInt(0, 59)) / 60)
+      : (getRandomInt(3, 10) + getRandomInt(0, 59) / 60);
+    return { label: type, started, completed, avgDuration, color: pieColors[idx % pieColors.length] };
+  }));
+  const [pieData] = useState(() => moduleBreakdown.map(m => ({ label: m.label, count: Math.max(1, m.started), color: m.color })));
+  const totalPie = pieData.reduce((s, d) => s + d.count, 0);
+  const [hoveredSlice, setHoveredSlice] = useState<number | null>(null);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 font-sans">
@@ -270,47 +386,157 @@ export default function Home() {
 
       {/* Overview Cards - moved to top */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          <div className="flex items-center gap-4 bg-gradient-to-r from-blue-100 to-blue-50 rounded-xl shadow hover:shadow-lg transition p-6">
-            <div className="bg-blue-200 rounded-full p-2">
-              <CalendarIcon />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+          {/* Left: 2x2 grid with top 3 cards */}
+          <div className="lg:col-span-1 grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="flex items-center gap-4 bg-gradient-to-r from-blue-100 to-blue-50 rounded-xl shadow hover:shadow-lg transition p-6">
+              <div className="bg-blue-200 rounded-full p-2">
+                <CalendarIcon />
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold text-blue-700 uppercase">Total Sessions</h3>
+                <p className="text-3xl font-bold text-blue-900">{totalSessions}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-xs font-semibold text-blue-700 uppercase">Total Sessions</h3>
-              <p className="text-3xl font-bold text-blue-900">{totalSessions}</p>
+            <div className="flex items-center gap-4 bg-gradient-to-r from-purple-100 to-purple-50 rounded-xl shadow hover:shadow-lg transition p-6">
+              <div className="bg-purple-200 rounded-full p-2">
+                <DurationIcon />
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold text-purple-700 uppercase">Avg Session Duration</h3>
+                <p className="text-3xl font-bold text-purple-900">{avgSessionDuration.toFixed(1)}m</p>
+                <p className="text-xs text-purple-700 mt-1">{avgSessionDuration.toFixed(1)}m average</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 bg-gradient-to-r from-green-100 to-green-50 rounded-xl shadow hover:shadow-lg transition p-6">
+              <div className="bg-green-200 rounded-full p-2">
+                <CheckmarkIcon />
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold text-green-700 uppercase">Total Modules Played</h3>
+                <p className="text-3xl font-bold text-green-900">{totalModulesPlayed}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 bg-gradient-to-r from-teal-100 to-teal-50 rounded-xl shadow hover:shadow-lg transition p-6">
+              <div className="bg-teal-200 rounded-full p-2">
+                <DurationIcon />
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold text-teal-700 uppercase">Avg Module Duration</h3>
+                <p className="text-3xl font-bold text-teal-900">{avgModuleDuration.toFixed(1)}m</p>
+                <p className="text-xs text-teal-700 mt-1">{avgModuleDuration.toFixed(1)}m average</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-4 bg-gradient-to-r from-purple-100 to-purple-50 rounded-xl shadow hover:shadow-lg transition p-6">
-            <div className="bg-purple-200 rounded-full p-2">
-              <DurationIcon />
-            </div>
-            <div>
-              <h3 className="text-xs font-semibold text-purple-700 uppercase">Avg Session Duration</h3>
-              <p className="text-3xl font-bold text-purple-900">{avgSessionDuration.toFixed(1)}m</p>
-              <p className="text-xs text-purple-700 mt-1">
-                {avgSessionDuration.toFixed(1)}m average
-              </p>
+          {/* Right: Big card spanning height of two rows */}
+          <div className="bg-white rounded-xl shadow p-6 min-h-[260px] lg:min-h-[100%] lg:col-span-1">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Average time share per session</h3>
+            <div className="flex flex-col lg:flex-row items-center gap-6">
+              {/* Pie Chart */}
+              <svg width="260" height="260" viewBox="0 0 260 260" className="shrink-0">
+                {(() => {
+                  const cx = 130, cy = 130, r = 100;
+                  let currentAngle = -90; // start at top
+                  return pieData.map((slice, i) => {
+                    const angle = (slice.count / totalPie) * 360;
+                    const path = describeArc(cx, cy, r, currentAngle, currentAngle + angle);
+                    const midAngle = currentAngle + angle / 2;
+                    const offset = hoveredSlice === i ? 8 : 0; // how far to "explode" the slice
+                    const dx = Math.cos(toRadians(midAngle)) * offset;
+                    const dy = Math.sin(toRadians(midAngle)) * offset;
+                    const el = (
+                      <path
+                        key={slice.label}
+                        d={path}
+                        fill={slice.color}
+                        stroke="#ffffff"
+                        strokeWidth="1"
+                        onMouseEnter={() => setHoveredSlice(i)}
+                        onMouseLeave={() => setHoveredSlice(null)}
+                        style={{ cursor: "pointer", transform: `translate(${dx}px, ${dy}px)`, transition: "transform 0.25s ease-in-out" }}
+                      />
+                    );
+                    currentAngle += angle;
+                    return el;
+                  });
+                })()}
+              </svg>
+              {/* Legend */}
+              <div className="flex flex-col gap-2">
+                {pieData.map((d, i) => {
+                  const details = moduleBreakdown[i];
+                  const pct = Math.round((d.count / totalPie) * 100);
+                  const completedPct = Math.round((details.completed / Math.max(1, details.started)) * 100);
+                  const completedPctDisplay = Math.max(50, Math.min(95, completedPct));
+                  return (
+                  <div key={d.label} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="inline-block w-3 h-3 rounded mt-1" style={{ backgroundColor: d.color }}></span>
+                    <div className="leading-tight">
+                      <div className="font-medium">{d.label}</div>
+                      <div className="text-xs text-gray-500">{pct}%</div>
+                      <AnimatePresence initial={false}>
+                        {hoveredSlice === i && (
+                          <motion.div
+                            key={`extra-${i}`}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.25, ease: "easeInOut" }}
+                            className="mt-1 text-xs text-gray-500"
+                          >
+                            <div><span className="font-semibold">{details.started}</span> sessions played in total</div>
+                            <div><span className="font-semibold">{formatDuration(details.avgDuration)}</span> spent on average</div>
+                            <div><span className="font-semibold">{completedPctDisplay}%</span> of players finished the module</div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                )})}
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-4 bg-gradient-to-r from-green-100 to-green-50 rounded-xl shadow hover:shadow-lg transition p-6">
-            <div className="bg-green-200 rounded-full p-2">
-              <CheckmarkIcon />
+        </div>
+      </section>
+
+      {/* Fun facts Section - between Overview and Session & Module Completion Overview */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <h2 className="text-xl font-bold text-gray-800 mb-4">Fun facts</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="flex items-center gap-4 bg-teal-50 hover:bg-teal-100 rounded-xl shadow transition p-6">
+            <div className="hidden">
+              <FunStatsIcon />
             </div>
             <div>
-              <h3 className="text-xs font-semibold text-green-700 uppercase">Total Modules Played</h3>
-              <p className="text-3xl font-bold text-green-900">{totalModulesPlayed}</p>
+              <h3 className="text-xs font-semibold text-amber-700 uppercase">Virtual beers poured</h3>
+              <p className="text-3xl font-bold text-amber-900">{funFacts.virtualBeersPoured}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 bg-gradient-to-r from-teal-100 to-teal-50 rounded-xl shadow hover:shadow-lg transition p-6">
-            <div className="bg-teal-200 rounded-full p-2">
-              <DurationIcon />
+          <div className="flex items-center gap-4 bg-teal-50 hover:bg-teal-100 rounded-xl shadow transition p-6">
+            <div className="hidden">
+              <FunStatsIcon />
             </div>
             <div>
-              <h3 className="text-xs font-semibold text-teal-700 uppercase">Avg Module Duration</h3>
-              <p className="text-3xl font-bold text-teal-900">{avgModuleDuration.toFixed(1)}m</p>
-              <p className="text-xs text-teal-700 mt-1">
-                {avgModuleDuration.toFixed(1)}m average
-              </p>
+              <h3 className="text-xs font-semibold text-violet-700 uppercase">Virtual customers served</h3>
+              <p className="text-3xl font-bold text-violet-900">{funFacts.beersServed}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 bg-teal-50 hover:bg-teal-100 rounded-xl shadow transition p-6">
+            <div className="hidden">
+              <FunStatsIcon />
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold text-cyan-700 uppercase">Glasses broken</h3>
+              <p className="text-3xl font-bold text-cyan-900">{funStats.glassesBroken}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 bg-teal-50 hover:bg-teal-100 rounded-xl shadow transition p-6">
+            <div className="hidden">
+              <FunStatsIcon />
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold text-indigo-700 uppercase">Glasses touching the tap</h3>
+              <p className="text-3xl font-bold text-indigo-900">{funFacts.glassesTouchingTap}</p>
             </div>
           </div>
         </div>
@@ -409,7 +635,7 @@ export default function Home() {
         {/* Section: Activity */}
         <div className="flex flex-col lg:flex-row gap-8 mb-10">
           {/* Session Activity */}
-          <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition">
+          <div className="flex-1 bg-gray-50 rounded-2xl shadow-lg p-6 hover:bg-gray-100 transition">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-blue-900 flex items-center gap-2">
                 <CalendarIcon /> Session Activity
@@ -432,105 +658,144 @@ export default function Home() {
                 className="overflow-hidden"
               >
                 <div className="space-y-4">
-                  {(showAllSessions ? sortedSessions : sortedSessions.slice(0, 5)).map((session) => (
-                    <div key={session.id} className="border-l-4 border-blue-400 pl-4 pr-6 py-2 bg-blue-50/50 rounded-lg hover:bg-blue-100/70 transition">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium text-gray-900">Session <span className="font-mono">{session.id}</span></p>
-                          <p className="text-xs text-gray-500">Device: {session.deviceId} | App: {session.appId}</p>
-                          <p className="text-xs text-gray-500">Start: {formatTime(session.startTime)}</p>
+                  {(showAllSessions ? sortedSessions : sortedSessions.slice(0, 5)).map((session) => {
+                    const isExpanded = !!expandedSessions[session.id];
+                    const sessionModules = modules.filter(m => m.sessionId === session.id);
+                    return (
+                      <div
+                        key={session.id}
+                        className="border-l-4 border-[#4AB2AC] pl-4 pr-6 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition cursor-pointer"
+                        onClick={() => setExpandedSessions(prev => ({ ...prev, [session.id]: !prev[session.id] }))}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium text-gray-900">Session <span className="font-mono">{session.id.replace('session-', '')}</span></p>
+                            <p className="text-xs text-gray-500">Device: {session.deviceId} | App: {session.appId}</p>
+                            <p className="text-xs text-gray-500">Start: {formatTime(session.startTime)}</p>
+                          </div>
+                          <div className="text-right min-w-[120px]">
+                            <p className="text-xs text-gray-500">Duration: {formatDuration(session.duration)}</p>
+                            <Bar value={session.duration} max={avgSessionDuration} color="bg-[#4AB2AC]" />
+                          </div>
                         </div>
-                        <div className="text-right min-w-[120px]">
-                          <p className="text-xs text-gray-500">Duration: {formatDuration(session.duration)}</p>
-                          <Bar value={session.duration} max={avgSessionDuration} color="bg-blue-400" />
-                        </div>
+                        <AnimatePresence initial={false}>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.35, ease: 'easeInOut' }}
+                              className="overflow-hidden"
+                            >
+                              <div className="mt-3 pl-1">
+                                <div className="text-xs font-semibold text-blue-900 mb-2">Modules played in this session</div>
+                                <div className="flex flex-col space-y-3 bg-white/60 rounded-md">
+                                  {sessionModules.length === 0 ? (
+                                    <div className="text-xs text-gray-500 px-3 py-2">No modules recorded</div>
+                                  ) : (
+                                    sessionModules.map((m) => {
+                                      const isPerfectPour = m.moduleId === "Perfect Pour - The basics" || m.moduleId === "Perfect Pour - Masterclass";
+                                      const isBeerTypes = m.moduleId === "Beer types";
+                                      return (
+                                        <div key={m.id} className={`px-4 py-3 rounded bg-gray-50 border-2 border-gray-200 border-l-4 border-l-gray-300`}>
+                                          <div className="flex items-start justify-between">
+                                            <div className="flex flex-col gap-1">
+                                              <span className="text-sm text-gray-800 font-semibold">{m.moduleId}</span>
+                                              <div className="flex items-center gap-1">
+                                                <span className="text-xs text-gray-700">Duration: {formatDuration(m.duration)}</span>
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-gray-100 text-gray-600 border border-gray-200">{formatTimeHMS(m.startTime)} <span className="mx-1">→</span>{formatTimeHMS(m.endTime)}</span>
+                                              </div>
+                                            </div>
+                                            <div className="flex items-start">
+                                              <StatusBadge status={m.status} />
+                                            </div>
+                                          </div>
+                                          {isPerfectPour && (
+                                            <motion.div
+                                              initial={{ height: 0, opacity: 0 }}
+                                              animate={{ height: 'auto', opacity: 1 }}
+                                              transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                              className="overflow-hidden"
+                                            >
+                                              {(() => {
+                                                const pours = [
+                                                  m.averageScorePour1 || 0,
+                                                  m.averageScorePour2 || 0,
+                                                  m.averageScorePour3 || 0,
+                                                  m.averageScorePour4 || 0,
+                                                  m.averageScorePour5 || 0,
+                                                ];
+                                                const maxVal = Math.max(1, ...pours);
+                                                return (
+                                                  <div className="mt-2">
+                                                    <div className="p-3 rounded-md bg-gray-50">
+                                                      <div className="flex items-start gap-4">
+                                                        <div className="text-xs text-gray-700 font-medium leading-snug w-40">
+                                                          Score of beers poured in challenge
+                                                        </div>
+                                                        <div className="h-24 flex items-end gap-3">
+                                                          {pours.map((val, idx) => (
+                                                            <div key={idx} className="flex flex-col items-center w-10">
+                                                              <div className="text-[10px] text-gray-600 mb-1 font-semibold">{val}</div>
+                                                              <div className="w-full h-16 bg-gray-100 rounded flex items-end">
+                                                                <div
+                                                                  className="w-full rounded-t"
+                                                                  style={{ height: `${Math.max(6, Math.round((val / maxVal) * 100))}%`, backgroundColor: '#4AB2AC' }}
+                                                                ></div>
+                                                              </div>
+                                                              <div className="text-[10px] text-gray-500 mt-1">{idx + 1}</div>
+                                                            </div>
+                                                          ))}
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })()}
+                                            </motion.div>
+                                          )}
+                                          {isBeerTypes && (
+                                            <motion.div
+                                              initial={{ height: 0, opacity: 0 }}
+                                              animate={{ height: 'auto', opacity: 1 }}
+                                              transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                              className="overflow-hidden"
+                                            >
+                                              <div className="mt-2 p-3 rounded-md bg-gray-50 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                                <div className="flex flex-col items-center">
+                                                  <div className="text-[11px] text-gray-600 font-medium">Customers served</div>
+                                                  <div className="text-base font-semibold text-teal-900">{m.customersServed}</div>
+                                                </div>
+                                                <div className="flex flex-col items-center">
+                                                  <div className="text-[11px] text-gray-600 font-medium">Correct beers served</div>
+                                                  <div className="text-base font-semibold text-teal-900">{m.correctBeersServed} / {m.customersServed}</div>
+                                                </div>
+                                                <div className="flex flex-col items-center">
+                                                  <div className="text-[11px] text-gray-600 font-medium">Score</div>
+                                                  <div className="text-base font-semibold text-teal-900">{m.status === 'completed' ? m.beerTypesScore : 'N / A'}</div>
+                                                </div>
+                                              </div>
+                                            </motion.div>
+                                          )}
+                                        </div>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </motion.div>
             </AnimatePresence>
           </div>
 
-          {/* Module Performance */}
-          <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 hover:shadow-2xl transition">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-green-900 flex items-center gap-2">
-                <CheckmarkIcon /> Module Performance
-              </h3>
-              <button
-                className="flex items-center px-3 py-1 rounded-full bg-green-50 hover:bg-green-100 text-green-700 font-semibold text-xs transition-colors"
-                onClick={() => setShowAllModules(v => !v)}
-              >
-                {showAllModules ? "See less" : "See more"}
-                <ChevronIcon expanded={showAllModules} colorClass="text-green-700" />
-              </button>
-            </div>
-            <AnimatePresence initial={false}>
-              <motion.div
-                key={showAllModules ? 'expanded' : 'collapsed'}
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.5, ease: 'easeInOut' }}
-                className="overflow-hidden"
-              >
-                <div className="space-y-4">
-                  {(showAllModules ? modules : modules.slice(-5)).map((module) => (
-                    <div
-                      key={module.id}
-                      className={`border-l-4 border-green-400 pl-4 pr-6 py-2 bg-green-50/50 rounded-lg hover:bg-green-100/70 transition cursor-pointer`}
-                      onClick={() => module.moduleId === "Perfect Pour" ? setExpandedModuleId(expandedModuleId === module.id ? null : module.id) : null}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium text-gray-900">{module.moduleId} <span className="font-mono text-xs text-gray-500">({module.id})</span></p>
-                          <p className="text-xs text-gray-500">Session: {module.sessionId}</p>
-                          <p className="text-xs text-gray-500">Start: {formatTime(module.startTime)}</p>
-                        </div>
-                        <div className="text-right min-w-[120px]">
-                          <p className="text-xs text-gray-500">Duration: {formatDuration(module.duration)}</p>
-                          <Bar value={module.duration} max={avgModuleDuration} color="bg-green-400" />
-                          <div className="h-2" />
-                          <StatusBadge status={module.status} />
-                        </div>
-                      </div>
-                      {module.moduleId === "Perfect Pour" && (
-                        <>
-                          {/* Always visible: first two lines */}
-                          <div className="mt-2 text-xs text-gray-700">
-                            <div>Avg. score per beer: <span className="font-semibold">{typeof module.averageScorePerBeer === 'number' ? module.averageScorePerBeer : 0}</span></div>
-                            <div>Challenge high score: <span className="font-semibold">{module.status === 'exited' ? 'none' : (typeof module.challengeHighScore === 'number' ? module.challengeHighScore : 0)}</span></div>
-                          </div>
-                          {/* Expandable: pour scores and avg. total */}
-                          <AnimatePresence initial={false}>
-                            {expandedModuleId === module.id && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.4, ease: 'easeInOut' }}
-                                className="overflow-hidden"
-                              >
-                                <div className="mt-1 flex flex-col gap-y-1 text-xs text-gray-700">
-                                  <div>Pour 1: <span className="font-semibold">{module.averageScorePour1}</span></div>
-                                  <div>Pour 2: <span className="font-semibold">{module.averageScorePour2}</span></div>
-                                  <div>Pour 3: <span className="font-semibold">{module.averageScorePour3}</span></div>
-                                  <div>Pour 4: <span className="font-semibold">{module.averageScorePour4}</span></div>
-                                  <div>Pour 5: <span className="font-semibold">{module.averageScorePour5}</span></div>
-                                  <div className="pt-1">Avg. total: <span className="font-semibold">{module.averageTotal}</span></div>
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          </div>
+          {/* Right column placeholder card */}
+          <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 min-h-[200px]" />
         </div>
 
         {/* Section: Details */}
