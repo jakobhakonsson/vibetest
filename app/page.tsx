@@ -82,6 +82,22 @@ const FunStatsIcon = () => (
   </svg>
 );
 
+// New tutorial/book icon
+const BookIcon = () => (
+  <svg className="w-7 h-7 text-blue-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4.5A2.5 2.5 0 016.5 2H20v18H6.5A2.5 2.5 0 014 17.5v-13z" />
+  </svg>
+);
+
+// New ingredients/beaker icon
+const BeakerIcon = () => (
+  <svg className="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 3h6M10 3v5l-5.5 9.5A3 3 0 007 21h10a3 3 0 002.5-3.5L14 8V3" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 14h8" />
+  </svg>
+);
+
 // Move StatusBadge and Bar above Home so they are in scope
 const StatusBadge = ({ status }: { status: string }) => (
   <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${
@@ -144,6 +160,7 @@ export default function Home() {
     customersServed?: number;
     correctBeersServed?: number;
     beerTypesScore?: number;
+    ingredientsScore?: number | null;
   };
   // Move mock data generation here so it runs on every reload
   const [sessions] = useState(() => Array.from({ length: 120 }, (_, i) => {
@@ -227,6 +244,10 @@ export default function Home() {
           base.customersServed = customers;
           base.correctBeersServed = getRandomInt(0, customers);
           base.beerTypesScore = getRandomInt(0, 150000);
+        }
+        if (moduleId === "Ingredients") {
+          // Mock an ingredients score (e.g., ingredient identification correctness)
+          base.ingredientsScore = status === "completed" ? getRandomInt(50, 100) : null; // percent 50-100 when completed
         }
         generated.push(base);
         // Advance rolling offset to stagger module starts within session
@@ -327,6 +348,11 @@ export default function Home() {
     return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x} ${end.y} Z`;
   };
 
+  // Format large numbers with thousands separators
+  const formatNumber = (num: number) => {
+    try { return num.toLocaleString(); } catch { return String(num); }
+  };
+
   // Build stable module breakdown (once) and derive pie data
   const [moduleBreakdown] = useState(() => moduleTypes.map((type, idx) => {
     const started = getRandomInt(100, 200);
@@ -347,7 +373,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center gap-3">
-              <Image
+        <Image
                 src="/core-logo.png"
                 alt="Core Logo"
                 width={48}
@@ -503,7 +529,7 @@ export default function Home() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <h2 className="text-xl font-bold text-gray-800 mb-4">Fun facts</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="flex items-center gap-4 bg-teal-50 hover:bg-teal-100 rounded-xl shadow transition p-6">
+          <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
             <div className="hidden">
               <FunStatsIcon />
             </div>
@@ -512,7 +538,7 @@ export default function Home() {
               <p className="text-3xl font-bold text-amber-900">{funFacts.virtualBeersPoured}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 bg-teal-50 hover:bg-teal-100 rounded-xl shadow transition p-6">
+          <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
             <div className="hidden">
               <FunStatsIcon />
             </div>
@@ -521,7 +547,7 @@ export default function Home() {
               <p className="text-3xl font-bold text-violet-900">{funFacts.beersServed}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 bg-teal-50 hover:bg-teal-100 rounded-xl shadow transition p-6">
+          <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
             <div className="hidden">
               <FunStatsIcon />
             </div>
@@ -530,7 +556,7 @@ export default function Home() {
               <p className="text-3xl font-bold text-cyan-900">{funStats.glassesBroken}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 bg-teal-50 hover:bg-teal-100 rounded-xl shadow transition p-6">
+          <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
             <div className="hidden">
               <FunStatsIcon />
             </div>
@@ -794,8 +820,128 @@ export default function Home() {
             </AnimatePresence>
           </div>
 
-          {/* Right column placeholder card */}
-          <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 min-h-[200px]" />
+          {/* Right column: Module overview card */}
+          <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 min-h-[200px]">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Module overview</h3>
+            {(() => {
+              // Aggregate stats per module type from existing mock data
+              const byType = moduleTypes.map((type) => {
+                const items = modules.filter(m => m.moduleId === type);
+                const plays = items.length;
+                const uniqueSessions = new Set(items.map(m => m.sessionId)).size;
+                const completed = items.filter(m => m.status === 'completed').length;
+                const completion = plays > 0 ? Math.round((completed / plays) * 100) : 0;
+                const avgDurationMins = plays > 0 ? (items.reduce((s, m) => s + m.duration, 0) / plays) : 0;
+                const avgPlaysPerSession = uniqueSessions > 0 ? (plays / uniqueSessions) : 0;
+                // Highscores for Perfect Pour variants
+                let avgHighScore: number | null = null;
+                let maxHighScore: number | null = null;
+                let avgScoreImprovementPct: number | null = null;
+                if (type === 'Perfect Pour - The basics' || type === 'Perfect Pour - Masterclass') {
+                  const hs = items
+                    .map(m => (typeof m.challengeHighScore === 'number' ? m.challengeHighScore as number : null))
+                    .filter((v): v is number => v !== null);
+                  const avgTotals = items
+                    .map(m => (typeof m.averageTotal === 'number' ? m.averageTotal as number : null))
+                    .filter((v): v is number => v !== null);
+                  if (hs.length > 0) {
+                    avgHighScore = Math.round(hs.reduce((s, v) => s + v, 0) / hs.length);
+                    maxHighScore = Math.max(...hs);
+                  }
+                  if (avgHighScore !== null && avgTotals.length > 0) {
+                    const avgBaseline = avgTotals.reduce((s, v) => s + v, 0) / avgTotals.length;
+                    if (avgBaseline > 0) {
+                      avgScoreImprovementPct = Math.round(((avgHighScore / avgBaseline) - 1) * 100);
+                    }
+                  }
+                }
+                return { type, plays, uniqueSessions, completion, avgDurationMins, avgPlaysPerSession, avgHighScore, avgScoreImprovementPct, maxHighScore };
+              });
+              const gradientForType = (type: string) => {
+                if (type === 'Perfect Pour - The basics' || type === 'Perfect Pour - Masterclass') {
+                  return 'from-green-100 to-green-50';
+                }
+                if (type === 'Ingredients') {
+                  return 'from-amber-100 to-amber-50';
+                }
+                if (type === 'Beer types') {
+                  return 'from-blue-100 to-blue-50';
+                }
+                if (type === 'Tutorial') {
+                  return 'from-purple-100 to-purple-50';
+                }
+                return 'from-gray-100 to-gray-50';
+              };
+              const iconForType = (type: string) => {
+                if (type === 'Tutorial') return BookIcon;
+                if (type === 'Perfect Pour - The basics') return CheckmarkIcon;
+                if (type === 'Perfect Pour - Masterclass') return BarChartIcon;
+                if (type === 'Ingredients') return BeakerIcon;
+                if (type === 'Beer types') return FunStatsIcon;
+                return CheckmarkIcon;
+              };
+              // Desired display order for cards
+              const desiredOrder = [
+                'Perfect Pour - The basics',
+                'Perfect Pour - Masterclass',
+                'Ingredients',
+                'Beer types',
+                'Tutorial',
+              ];
+              const byTypeSorted = [...byType].sort((a, b) => desiredOrder.indexOf(a.type) - desiredOrder.indexOf(b.type));
+
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {byTypeSorted.map((row, idx) => {
+                    const GIcon = iconForType(row.type);
+                    return (
+                      <div
+                        key={row.type}
+                        className={`rounded-xl bg-gradient-to-r ${gradientForType(row.type)} p-5 shadow hover:shadow-lg transition`}
+                      >
+                        <div className="flex flex-col items-center text-center">
+                          <div className="mb-2">
+                            <GIcon />
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900">{row.type}</div>
+                          <div className="mt-3 grid grid-cols-2 gap-2 w-full">
+                            <div className="bg-white/80 rounded-lg px-2 py-2">
+                              <div className="text-[11px] text-gray-600">Total times played</div>
+                              <div className="text-sm font-semibold text-gray-900">{row.plays}</div>
+                            </div>
+                            <div className="bg-white/80 rounded-lg px-2 py-2">
+                              <div className="text-[11px] text-gray-600">Completion rate</div>
+                              <div className="text-sm font-semibold text-gray-900">{row.completion}%</div>
+                            </div>
+                            <div className="bg-white/80 rounded-lg px-2 py-2">
+                              <div className="text-[11px] text-gray-600"><span>Avg<br/>duration</span></div>
+                              <div className="text-sm font-semibold text-gray-900">{formatDuration(row.avgDurationMins)}</div>
+                            </div>
+                            <div className="bg-white/80 rounded-lg px-2 py-2">
+                              <div className="text-[11px] text-gray-600">Avg plays per session</div>
+                              <div className="text-sm font-semibold text-gray-900">{row.avgPlaysPerSession.toFixed(2)}</div>
+                            </div>
+                            <div className="bg-white/80 rounded-lg px-2 py-2">
+                              <div className="text-[11px] text-gray-600"><span>Avg<br/>highscore</span></div>
+                              <div className="text-sm font-semibold text-gray-900">{row.avgHighScore !== null ? formatNumber(row.avgHighScore) : 'N / A'}</div>
+                            </div>
+                            <div className="bg-white/80 rounded-lg px-2 py-2">
+                              <div className="text-[11px] text-gray-600">Avg score improvement</div>
+                              <div className="text-sm font-semibold text-gray-900">{row.avgScoreImprovementPct !== null ? `${row.avgScoreImprovementPct}%` : 'N / A'}</div>
+                            </div>
+                            <div className="bg-white/80 rounded-lg px-2 py-2 col-span-2">
+                              <div className="text-[11px] text-gray-600">Global highscore</div>
+                              <div className="text-sm font-semibold text-gray-900">{row.maxHighScore !== null ? formatNumber(row.maxHighScore) : 'N / A'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
         </div>
 
         {/* Section: Details */}
