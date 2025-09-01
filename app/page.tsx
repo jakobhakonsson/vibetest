@@ -296,16 +296,31 @@ export default function Home() {
 
   // Drilldown per module type
   const moduleTypes = Array.from(new Set(modules.map(m => m.moduleId)));
+  // Fixed order for Session & Module Completion Overview (includes new challenge variants)
+  const moduleTypesForStats = [
+    'Tutorial',
+    'Perfect Pour - The basics',
+    'Perfect Pour - The basics - Intro',
+    'The basics Challenge',
+    'Perfect Pour - Masterclass',
+    'Perfect Pour - Masterclass - Intro',
+    'Masterclass challenge',
+    'Ingredients',
+    'Beer types',
+    'Beer types - Intro',
+    'Beer types challenge',
+  ];
   // Generate once per page load so expanding/collapsing sessions won't change these numbers
-  const [moduleStats] = useState(() => moduleTypes.map(type => {
+  const [moduleStats] = useState(() => moduleTypesForStats.map(type => {
     const started = getRandomInt(100, 200);
     const completed = getRandomInt(0, started);
     const exited = started - completed;
+    const repeated = getRandomInt(0, Math.max(0, completed));
     // Avg duration: cap Ingredients at <= 5 minutes
     const avgDuration = type === "Ingredients"
       ? (getRandomInt(0, 5) + (getRandomInt(0, 5) === 5 ? 0 : getRandomInt(0, 59)) / 60)
       : (getRandomInt(3, 10) + getRandomInt(0, 59) / 60);
-    return { type, started, exited, completed, avgDuration };
+    return { type, started, exited, completed, repeated, avgDuration };
   }));
 
   // Format time
@@ -323,6 +338,13 @@ export default function Home() {
     const mins = Math.floor(minutes);
     const secs = Math.round((minutes - mins) * 60);
     return `${mins}m ${secs}s`;
+  };
+
+  // Format duration when value is in seconds (e.g., 241 -> 4m 1s)
+  const formatDurationFromSeconds = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${mins}m, ${secs}s`;
   };
 
   // Format time as HH:MM:SS (24-hour)
@@ -366,10 +388,14 @@ export default function Home() {
   const totalPie = pieData.reduce((s, d) => s + d.count, 0);
   const [hoveredSlice, setHoveredSlice] = useState<number | null>(null);
 
+  // Stable overview subheading numbers
+  const [headsetsReported] = useState(() => getRandomInt(50, 130));
+  const headsetsReportedPct = Math.round((headsetsReported / 130) * 100);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 font-sans">
-      {/* Header */}
-      <header className="bg-white/80 shadow-sm border-b sticky top-0 z-10 backdrop-blur">
+             {/* Header */}
+       <header className="bg-white/80 shadow-sm border-b sticky top-0 z-50 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center gap-3">
@@ -390,7 +416,7 @@ export default function Home() {
 
       {/* Overview Title and Dropdown - moved to top */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2">
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-4 mb-2">
           <h2 className="text-2xl font-bold text-gray-800">Overview</h2>
           <div className="relative">
             <select
@@ -400,6 +426,7 @@ export default function Home() {
               <option value="24h">Last 24 hours</option>
               <option value="30d">Last 30 days</option>
               <option value="all">All time</option>
+              <option value="pick">Pick dates</option>
             </select>
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-blue-400">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -408,6 +435,17 @@ export default function Home() {
             </span>
           </div>
         </div>
+        <p className="text-sm text-gray-600 mb-6">
+          {(() => {
+            const x = headsetsReported;
+            const y = headsetsReportedPct;
+            return (
+              <>
+                Showing data reported from <span className="font-bold">{x}</span> out of 130 headsets. <span className="font-bold">{y}%</span>. Note that data may be unrepresentative if reported from only a few headsets.
+              </>
+            );
+          })()}
+        </p>
       </section>
 
       {/* Overview Cards - moved to top */}
@@ -471,16 +509,24 @@ export default function Home() {
                     const dx = Math.cos(toRadians(midAngle)) * offset;
                     const dy = Math.sin(toRadians(midAngle)) * offset;
                     const el = (
-                      <path
-                        key={slice.label}
-                        d={path}
-                        fill={slice.color}
-                        stroke="#ffffff"
-                        strokeWidth="1"
-                        onMouseEnter={() => setHoveredSlice(i)}
-                        onMouseLeave={() => setHoveredSlice(null)}
-                        style={{ cursor: "pointer", transform: `translate(${dx}px, ${dy}px)`, transition: "transform 0.25s ease-in-out" }}
-                      />
+                      <g key={slice.label}>
+                        <path
+                          d={path}
+                          fill={slice.color}
+                          stroke="#ffffff"
+                          strokeWidth="1"
+                          style={{ cursor: "pointer", transform: `translate(${dx}px, ${dy}px)`, transition: "transform 0.25s ease-in-out" }}
+                        />
+                        <path
+                          d={path}
+                          fill="#000"
+                          fillOpacity="0.001"
+                          stroke="transparent"
+                          onMouseEnter={() => setHoveredSlice(i)}
+                          onMouseLeave={() => setHoveredSlice(null)}
+                          pointerEvents="all"
+                        />
+                      </g>
                     );
                     currentAngle += angle;
                     return el;
@@ -525,84 +571,49 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Fun facts Section - between Overview and Session & Module Completion Overview */}
+      {/* Fun facts + Copilot Row */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <h2 className="text-xl font-bold text-gray-800 mb-4">Fun facts</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
-            <div className="hidden">
-              <FunStatsIcon />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 lg:col-span-2">
+            <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
+              <div className="hidden">
+                <FunStatsIcon />
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold text-amber-700 uppercase">Virtual beers poured</h3>
+                <p className="text-3xl font-bold text-amber-900">{funFacts.virtualBeersPoured}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-xs font-semibold text-amber-700 uppercase">Virtual beers poured</h3>
-              <p className="text-3xl font-bold text-amber-900">{funFacts.virtualBeersPoured}</p>
+            <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
+              <div className="hidden">
+                <FunStatsIcon />
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold text-violet-700 uppercase">Virtual customers served</h3>
+                <p className="text-3xl font-bold text-violet-900">{funFacts.beersServed}</p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
-            <div className="hidden">
-              <FunStatsIcon />
+            <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
+              <div className="hidden">
+                <FunStatsIcon />
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold text-cyan-700 uppercase">Glasses broken</h3>
+                <p className="text-3xl font-bold text-cyan-900">{funStats.glassesBroken}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-xs font-semibold text-violet-700 uppercase">Virtual customers served</h3>
-              <p className="text-3xl font-bold text-violet-900">{funFacts.beersServed}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
-            <div className="hidden">
-              <FunStatsIcon />
-            </div>
-            <div>
-              <h3 className="text-xs font-semibold text-cyan-700 uppercase">Glasses broken</h3>
-              <p className="text-3xl font-bold text-cyan-900">{funStats.glassesBroken}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
-            <div className="hidden">
-              <FunStatsIcon />
-            </div>
-            <div>
-              <h3 className="text-xs font-semibold text-indigo-700 uppercase">Glasses touching the tap</h3>
-              <p className="text-3xl font-bold text-indigo-900">{funFacts.glassesTouchingTap}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* New Section: Session & Module Completion Overview */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Session & Module Completion Overview</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Completion Rate per Module (2/3 width) */}
-          <div className="bg-white rounded-xl shadow p-6 md:col-span-2 w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Completion Rate per Module</h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Module</th>
-                    <th className="px-6 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Started</th>
-                    <th className="px-6 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Exited</th>
-                    <th className="px-6 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Completed</th>
-                    <th className="px-6 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Avg Duration</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {moduleStats.map(stat => (
-                    <tr key={stat.type}>
-                      <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{stat.type}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-700">{stat.started}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-700">{stat.exited}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-700">{stat.completed}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-700">{formatDuration(stat.avgDuration)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
+              <div className="hidden">
+                <FunStatsIcon />
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold text-indigo-700 uppercase">Glasses touching the tap</h3>
+                <p className="text-3xl font-bold text-indigo-900">{funFacts.glassesTouchingTap}</p>
+              </div>
             </div>
           </div>
-          {/* New empty card (1/3 width) */}
-          <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center min-h-[200px] justify-center md:col-span-1 w-full">
-            {/* Copilot card (was AI Query) */}
+          <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center min-h-[200px] justify-center w-full">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center justify-center">
               <CopilotIcon /> Copilot
             </h3>
@@ -656,12 +667,492 @@ export default function Home() {
         </div>
       </section>
 
+      
+
+      {/* New Section: Session & Module Completion Overview (full width) */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <h2 className="text-xl font-bold text-gray-800 mb-4">Session & Module Completion Overview</h2>
+        <div className="grid grid-cols-1 gap-6">
+          <div className="bg-white rounded-xl shadow p-6 w-full">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Completion Rate per Module</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Module</th>
+                    <th className="px-6 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Started</th>
+                    <th className="px-6 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Exited</th>
+                    <th className="px-6 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Completed</th>
+                    <th className="px-6 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Repeated</th>
+                    <th className="px-6 py-3 text-left font-bold text-gray-700 uppercase tracking-wider">Avg Duration</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-transparent">
+                  {moduleStats.map(stat => (
+                    <tr key={stat.type}>
+                      <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                        <span className={`${stat.type.toLowerCase().includes('intro') || stat.type.toLowerCase().includes('challenge') ? 'pl-6 text-gray-700 font-medium' : 'font-bold'}`}>
+                          {stat.type.toLowerCase().includes('intro') ? 'Intro' : (stat.type.toLowerCase().includes('challenge') ? 'Challenge' : stat.type)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-700">{stat.started}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-700">{stat.exited}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-700">{stat.completed} ({Math.round((stat.completed / Math.max(1, stat.started)) * 100)}%)</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-700">{stat.repeated}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-700">{formatDuration(stat.avgDuration)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Module Overview Section - moved to its own section before Session Activity */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <h2 className="text-xl font-bold text-gray-800 mb-4">Module Overview</h2>
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+          {(() => {
+            // Aggregate stats per module type from existing mock data
+            const byType = moduleTypes.map((type) => {
+              const items = modules.filter(m => m.moduleId === type);
+              const plays = items.length;
+              const uniqueSessions = new Set(items.map(m => m.sessionId)).size;
+              const completed = items.filter(m => m.status === 'completed').length;
+              const completion = plays > 0 ? Math.round((completed / plays) * 100) : 0;
+              const avgDurationMins = plays > 0 ? (items.reduce((s, m) => s + m.duration, 0) / plays) : 0;
+              const avgPlaysPerSession = uniqueSessions > 0 ? (plays / uniqueSessions) : 0;
+              // Highscores for Perfect Pour variants
+              let avgHighScore: number | null = null;
+              let maxHighScore: number | null = null;
+              let avgScoreImprovementPct: number | null = null;
+              if (type === 'Perfect Pour - The basics' || type === 'Perfect Pour - Masterclass') {
+                const hs = items
+                  .map(m => (typeof m.challengeHighScore === 'number' ? m.challengeHighScore as number : null))
+                  .filter((v): v is number => v !== null);
+                const avgTotals = items
+                  .map(m => (typeof m.averageTotal === 'number' ? m.averageTotal as number : null))
+                  .filter((v): v is number => v !== null);
+                if (hs.length > 0) {
+                  avgHighScore = Math.round(hs.reduce((s, v) => s + v, 0) / hs.length);
+                  maxHighScore = Math.max(...hs);
+                }
+                if (avgHighScore !== null && avgTotals.length > 0) {
+                  const avgBaseline = avgTotals.reduce((s, v) => s + v, 0) / avgTotals.length;
+                  if (avgBaseline > 0) {
+                    avgScoreImprovementPct = Math.round(((avgHighScore / avgBaseline) - 1) * 100);
+                  }
+                }
+              } else if (type === 'Beer types') {
+                // Mock highscores for Beer types similar scale to Perfect Pour
+                const base = 50000;
+                const jitter = Math.floor(Math.random() * 8000) - 4000; // ±4,000
+                avgHighScore = base + jitter; // ~46,000–54,000
+                const extra = Math.floor(Math.random() * 6000) + 2000; // avg + 2,000–7,999
+                maxHighScore = (avgHighScore as number) + extra;
+                // optional improvement metric even if not displayed
+                avgScoreImprovementPct = Math.floor(Math.random() * 21) + 5; // 5–25%
+              }
+              return { type, plays, uniqueSessions, completion, avgDurationMins, avgPlaysPerSession, avgHighScore, avgScoreImprovementPct, maxHighScore };
+            });
+            const gradientForType = (type: string) => {
+              if (type === 'Perfect Pour - The basics' || type === 'Perfect Pour - Masterclass') {
+                return 'from-green-100 to-green-50';
+              }
+              if (type === 'Ingredients') {
+                return 'from-amber-100 to-amber-50';
+              }
+              if (type === 'Beer types') {
+                return 'from-blue-100 to-blue-50';
+              }
+              if (type === 'Tutorial') {
+                return 'from-purple-100 to-purple-50';
+              }
+              return 'from-gray-100 to-gray-50';
+            };
+            const iconForType = (type: string) => {
+              if (type === 'Tutorial') return BookIcon;
+              if (type === 'Perfect Pour - The basics') return CheckmarkIcon;
+              if (type === 'Perfect Pour - Masterclass') return BarChartIcon;
+              if (type === 'Ingredients') return BeakerIcon;
+              if (type === 'Beer types') return FunStatsIcon;
+              return CheckmarkIcon;
+            };
+            // Desired display order for cards
+            const desiredOrder = [
+              'Perfect Pour - The basics',
+              'Perfect Pour - Masterclass',
+              'Ingredients',
+              'Beer types',
+              'Tutorial',
+            ];
+            const byTypeSorted = [...byType].sort((a, b) => desiredOrder.indexOf(a.type) - desiredOrder.indexOf(b.type));
+
+             return (
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                 {byTypeSorted.map((row, idx) => {
+                   const GIcon = iconForType(row.type);
+                   return (
+                     <div
+                       key={row.type}
+                       className={`rounded-xl bg-gradient-to-r ${gradientForType(row.type)} p-5 shadow hover:shadow-lg transition`}
+                     >
+                       <div className="flex flex-col items-center text-center">
+                         <div className="mb-2">
+                           <GIcon />
+                         </div>
+                         <div className="text-sm font-semibold text-gray-900">{row.type}</div>
+                         <div className="mt-3 grid grid-cols-2 gap-2 w-full">
+                           <div className="bg-white/80 rounded-lg px-2 py-2 col-span-2">
+                             {(() => {
+                               const usersPlayed = row.uniqueSessions;
+                               const total = Math.max(1, totalSessions);
+                               const pct = Math.round((usersPlayed / total) * 100);
+                               const radius = 28;
+                               const circumference = 2 * Math.PI * radius;
+                               const dashoffset = circumference * (1 - pct / 100);
+                               return (
+                                 <div className="flex flex-col items-center text-center">
+                                   <div className="relative w-16 h-16">
+                                     <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
+                                       <circle cx="32" cy="32" r={radius} stroke="currentColor" strokeWidth="4" fill="none" className="text-gray-200" />
+                                       <circle cx="32" cy="32" r={radius} stroke="currentColor" strokeWidth="4" fill="none" className="text-green-500" strokeDasharray={`${circumference}`} strokeDashoffset={`${dashoffset}`} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.5s ease-in-out' }} />
+                                     </svg>
+                                     <div className="absolute inset-0 flex items-center justify-center">
+                                       <span className="text-sm font-semibold text-gray-700">{pct}%</span>
+                                     </div>
+                                   </div>
+                                   <div className="text-xs text-gray-600 mt-2">
+                                     of users played this module ({usersPlayed} out of {total} total sessions)
+                                   </div>
+                                 </div>
+                               );
+                             })()}
+                           </div>
+                           <div className="bg-white/80 rounded-lg px-2 py-2 col-span-2">
+                             <div className="text-[11px] text-gray-600"><span>Avg<br/>highscore</span></div>
+                             <div className="text-sm font-semibold text-gray-900">{row.avgHighScore !== null ? formatNumber(row.avgHighScore) : 'N / A'}</div>
+                           </div>
+                           <div className="bg-white/80 rounded-lg px-2 py-2 col-span-2">
+                             <div className="text-[11px] text-gray-600">Global highscore</div>
+                             <div className="text-sm font-semibold text-gray-900">{row.maxHighScore !== null ? formatNumber(row.maxHighScore) : 'N / A'}</div>
+                           </div>
+                         </div>
+                       </div>
+                     </div>
+                   );
+                 })}
+               </div>
+             );
+           })()}
+         </div>
+       </section>
+
+                               {/* New Spreadsheet-style Module Data Section */}
+         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+           <h2 className="text-xl font-bold text-gray-800 mb-4">Module Data Spreadsheet</h2>
+           
+           <div className="bg-white shadow-lg p-6 overflow-x-auto">
+             {(() => {
+              // Aggregate stats per module type from existing mock data
+              const [byType] = useState(() => moduleTypes.map((type) => {
+                const items = modules.filter(m => m.moduleId === type);
+                const plays = items.length;
+                const uniqueSessions = new Set(items.map(m => m.sessionId)).size;
+                const completed = items.filter(m => m.status === 'completed').length;
+                const completion = plays > 0 ? Math.round((completed / plays) * 100) : 0;
+                const avgDurationMins = plays > 0 ? (items.reduce((s, m) => s + m.duration, 0) / plays) : 0;
+                const avgPlaysPerSession = uniqueSessions > 0 ? (plays / uniqueSessions) : 0;
+                // Highscores for Perfect Pour variants
+                let avgHighScore: number | null = null;
+                let maxHighScore: number | null = null;
+                let avgScoreImprovementPct: number | null = null;
+                if (type === 'Perfect Pour - The basics' || type === 'Perfect Pour - Masterclass') {
+                  const hs = items
+                    .map(m => (typeof m.challengeHighScore === 'number' ? m.challengeHighScore as number : null))
+                    .filter((v): v is number => v !== null);
+                  const avgTotals = items
+                    .map(m => (typeof m.averageTotal === 'number' ? m.averageTotal as number : null))
+                    .filter((v): v is number => v !== null);
+                  if (hs.length > 0) {
+                    avgHighScore = Math.round(hs.reduce((s, v) => s + v, 0) / hs.length);
+                    maxHighScore = Math.max(...hs);
+                  }
+                  if (avgHighScore !== null && avgTotals.length > 0) {
+                    const avgBaseline = avgTotals.reduce((s, v) => s + v, 0) / avgTotals.length;
+                    if (avgBaseline > 0) {
+                      avgScoreImprovementPct = Math.round(((avgHighScore / avgBaseline) - 1) * 100);
+                    }
+                  }
+                } else if (type === 'Beer types') {
+                  // Mock highscores for Beer types ~ around 50,000 like other modules
+                  const base = 50000;
+                  const jitter = Math.floor(Math.random() * 8000) - 4000; // ±4,000
+                  avgHighScore = base + jitter; // ~46,000–54,000
+                  const extra = Math.floor(Math.random() * 6000) + 2000; // 2,000–7,999 above avg
+                  maxHighScore = (avgHighScore as number) + extra;
+                  avgScoreImprovementPct = Math.floor(Math.random() * 21) + 5; // 5–25%
+                }
+                return { type, plays, uniqueSessions, completion, avgDurationMins, avgPlaysPerSession, avgHighScore, avgScoreImprovementPct, maxHighScore };
+              }));
+              
+              // Desired display order for modules
+              const desiredOrder = [
+                 'Tutorial',
+                 'Perfect Pour - The basics',
+                 'Perfect Pour - Masterclass',
+                 'Ingredients',
+                 'Beer types',
+               ];
+               const byTypeSorted = [...byType].sort((a, b) => desiredOrder.indexOf(a.type) - desiredOrder.indexOf(b.type));
+
+              const columnGradientForType = (type: string) => {
+                if (type === 'Perfect Pour - The basics' || type === 'Perfect Pour - Masterclass') {
+                  return 'from-green-50 to-transparent';
+                }
+                if (type === 'Ingredients') {
+                  return 'from-amber-50 to-transparent';
+                }
+                if (type === 'Beer types') {
+                  return 'from-blue-50 to-transparent';
+                }
+                if (type === 'Tutorial') {
+                  return 'from-purple-50 to-transparent';
+                }
+                return 'from-gray-50 to-transparent';
+              };
+
+              const columnHeaderGradientForType = (type: string) => {
+                if (type === 'Perfect Pour - The basics' || type === 'Perfect Pour - Masterclass') {
+                  return 'from-green-200 to-green-50';
+                }
+                if (type === 'Ingredients') {
+                  return 'from-amber-200 to-amber-50';
+                }
+                if (type === 'Beer types') {
+                  return 'from-blue-200 to-blue-50';
+                }
+                if (type === 'Tutorial') {
+                  return 'from-purple-200 to-purple-50';
+                }
+                return 'from-gray-200 to-gray-50';
+              };
+
+                               // Define the metrics to display
+                const metrics = [
+                  { key: 'plays', label: 'Total times played', formatter: (value: number) => value.toString() },
+                  { key: 'avgDuration', label: 'Average duration', formatter: (value: number) => value.toString() },
+                  { key: 'completion', label: 'Completion rate', formatter: (value: number) => `${value}%` },
+                  { key: 'avgPlaysPerSession', label: 'Avg plays per session', formatter: (value: number) => value.toFixed(2) },
+                ];
+
+                // Generate random duration data between 5 and 300 (stable per page load)
+                const [randomDurationData] = useState(() => ({
+                  'Tutorial': Math.floor(Math.random() * 296) + 5,
+                  'Perfect Pour - The basics': Math.floor(Math.random() * 296) + 5,
+                  'Perfect Pour - Masterclass': Math.floor(Math.random() * 296) + 5,
+                  'Ingredients': Math.floor(Math.random() * 296) + 5,
+                  'Beer types': Math.floor(Math.random() * 296) + 5,
+                }));
+
+               return (
+                 <div className="rounded-xl border border-gray-200 overflow-hidden shadow-lg">
+                   <table className="min-w-full border-separate border-spacing-x-4 border-spacing-y-0">
+                     <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                       <tr>
+                                                   <th className="px-8 py-6 text-left text-sm font-bold text-gray-800 uppercase tracking-wider bg-gradient-to-r from-blue-100 to-indigo-100 sticky left-0 z-20 border-r-2 border-gray-200 shadow-sm">
+                           <div className="flex items-center gap-3">Metrics</div>
+                         </th>
+                         {byTypeSorted.map((module) => (
+                           <th key={module.type} className={`px-8 py-6 text-center text-sm font-bold text-gray-800 uppercase tracking-wider min-w-[160px] bg-gradient-to-r ${columnHeaderGradientForType(module.type)}`}>
+                             <div className="flex flex-col items-center space-y-3">
+                               <div className="p-3 bg-white rounded-full shadow-md border-2 border-gray-100">
+                                 {(() => {
+                                   const iconForType = (type: string) => {
+                                     if (type === 'Tutorial') return BookIcon;
+                                     if (type === 'Perfect Pour - The basics') return CheckmarkIcon;
+                                     if (type === 'Perfect Pour - Masterclass') return BarChartIcon;
+                                     if (type === 'Ingredients') return BeakerIcon;
+                                     if (type === 'Beer types') return FunStatsIcon;
+                                     return CheckmarkIcon;
+                                   };
+                                   const Icon = iconForType(module.type);
+                                   return <Icon />;
+                                 })()}
+                               </div>
+                               <div className="text-xs text-gray-700 font-medium leading-tight px-2">
+                                 {module.type}
+                               </div>
+                             </div>
+                           </th>
+                         ))}
+                       </tr>
+                     </thead>
+                     <tbody className="bg-white divide-y divide-transparent">
+                       {metrics.map((metric, metricIndex) => (
+                         <tr key={metric.key} className={`bg-white`}>
+                                                       <td className="px-8 py-6 whitespace-nowrap text-sm font-semibold text-gray-800 bg-gradient-to-r from-blue-50 to-indigo-100 sticky left-0 z-20 border-r-2 border-gray-200 shadow-sm">
+                             <div className="flex items-center gap-3">{metric.label}</div>
+                           </td>
+                                                       {byTypeSorted.map((module) => (
+                              <td key={`${module.type}-${metric.key}`} className={`px-8 py-6 whitespace-nowrap text-sm text-gray-700 text-center hover:bg-blue-100/30 transition-colors duration-200 bg-gradient-to-r ${columnGradientForType(module.type)}`}>
+                                {metric.key === 'plays' ? (
+                                  <div className="flex flex-col items-center space-y-2">
+                                                                         {/* Bar Chart for Total times played */}
+                                     <div className="w-full max-w-[120px]">
+                                       <div className="relative">
+                                         {/* Bar Container */}
+                                         <div className="w-full h-20 bg-transparent rounded-lg overflow-hidden relative flex items-end">
+                                           <div
+                                             className="bar-narrow bg-blue-500 rounded-lg transition-all duration-300 ease-out"
+                                             style={{ 
+                                               height: `${Math.max(4, (module.plays / Math.max(...byTypeSorted.map(m => m.plays))) * 100)}%`,
+                                               minHeight: '4px'
+                                             }}
+                                           />
+                                         </div>
+                                        {/* Value Label */}
+                                        <div className="text-xs font-semibold text-gray-700 mt-1">
+                                          {module.plays}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                                                 ) : metric.key === 'avgDuration' ? (
+                                  <div className="flex flex-col items-center space-y-2">
+                                    {/* Pie for Average duration (0–60 minutes) */}
+                                    <div className="relative w-16 h-16">
+                                      {(() => {
+                                        const seconds = randomDurationData[module.type as keyof typeof randomDurationData];
+                                        const minutes = Math.min(60, Math.max(0, Math.round(seconds / 60)));
+                                        const radius = 28;
+                                        const circumference = 2 * Math.PI * radius;
+                                        const progress = minutes / 60;
+                                        const offset = circumference * (1 - progress);
+                                        return (
+                                          <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
+                                            <circle cx="32" cy="32" r={radius} stroke="currentColor" strokeWidth="6" fill="none" className="text-gray-200" />
+                                            <circle cx="32" cy="32" r={radius} stroke="currentColor" strokeWidth="6" fill="none" className="text-teal-500" strokeDasharray={`${circumference}`} strokeDashoffset={`${offset}`} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.5s ease-in-out' }} />
+                                          </svg>
+                                        );
+                                      })()}
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className="text-xs font-semibold text-gray-700">
+                                          {formatDurationFromSeconds(randomDurationData[module.type as keyof typeof randomDurationData])}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : metric.key === 'avgHighScore' ? (
+                                  <div className="flex flex-col items-center space-y-2">
+                                    <div className="w-full max-w-[120px]">
+                                      {module.avgHighScore === null ? (
+                                        <div className="h-20 flex items-center justify-center text-gray-400 font-semibold">N/A</div>
+                                      ) : (
+                                        <div className="relative">
+                                          <div className="w-full h-20 bg-transparent rounded-lg overflow-hidden relative flex items-end">
+                                            <div
+                                              className="bar-narrow bg-purple-500 rounded-lg transition-all duration-300 ease-out"
+                                              style={{
+                                                height: `${Math.max(4, (((module.avgHighScore ?? 0) / Math.max(...byTypeSorted.map(m => (m.avgHighScore ?? 0)))) * 100))}%`,
+                                                minHeight: '4px'
+                                              }}
+                                            />
+                                          </div>
+                                          <div className="text-xs font-semibold text-gray-700 mt-1">
+                                            {formatNumber(module.avgHighScore as number)}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : metric.key === 'maxHighScore' ? (
+                                  <div className="flex flex-col items-center space-y-2">
+                                    <div className="w-full max-w-[120px]">
+                                      {module.maxHighScore === null ? (
+                                        <div className="h-20 flex items-center justify-center text-gray-400 font-semibold">N/A</div>
+                                      ) : (
+                                        <div className="relative">
+                                          <div className="w-full h-20 bg-transparent rounded-lg overflow-hidden relative flex items-end">
+                                            <div
+                                              className="bar-narrow bg-amber-500 rounded-lg transition-all duration-300 ease-out"
+                                              style={{
+                                                height: `${Math.max(4, (((module.maxHighScore ?? 0) / Math.max(...byTypeSorted.map(m => (m.maxHighScore ?? 0)))) * 100))}%`,
+                                                minHeight: '4px'
+                                              }}
+                                            />
+                                          </div>
+                                          <div className="text-xs font-semibold text-gray-700 mt-1">
+                                            {formatNumber(module.maxHighScore as number)}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : metric.key === 'completion' ? (
+                                   <div className="flex flex-col items-center space-y-2">
+                                     {/* Circular Progress for Completion Rate */}
+                                     <div className="relative w-16 h-16">
+                                       {/* Background Circle */}
+                                       <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
+                                         <circle
+                                           cx="32"
+                                           cy="32"
+                                           r="28"
+                                           stroke="currentColor"
+                                           strokeWidth="4"
+                                           fill="none"
+                                           className="text-gray-200"
+                                         />
+                                         {/* Progress Circle */}
+                                         <circle
+                                           cx="32"
+                                           cy="32"
+                                           r="28"
+                                           stroke="currentColor"
+                                           strokeWidth="4"
+                                           fill="none"
+                                           className="text-green-500"
+                                           strokeDasharray={`${2 * Math.PI * 28}`}
+                                           strokeDashoffset={`${2 * Math.PI * 28 * (1 - (module.completion / 100))}`}
+                                           strokeLinecap="round"
+                                           style={{
+                                             transition: 'stroke-dashoffset 0.5s ease-in-out'
+                                           }}
+                                         />
+                                       </svg>
+                                       {/* Percentage Text */}
+                                       <div className="absolute inset-0 flex items-center justify-center">
+                                         <span className="text-sm font-semibold text-gray-700">
+                                           {module.completion}%
+                                         </span>
+                                       </div>
+                                     </div>
+                                   </div>
+                                 ) : (
+                                   <div className="font-medium">
+                                     {metric.formatter(module[metric.key as keyof typeof module] as any)}
+                                   </div>
+                                 )}
+                              </td>
+                            ))}
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                 </div>
+               );
+            })()}
+          </div>
+        </section>
+
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Section: Activity */}
-        <div className="flex flex-col lg:flex-row gap-8 mb-10">
+        <div className="mb-10">
           {/* Session Activity */}
-          <div className="flex-1 bg-gray-50 rounded-2xl shadow-lg p-6 hover:bg-gray-100 transition">
+          <div className="bg-gray-50 rounded-2xl shadow-lg p-6 hover:bg-gray-100 transition">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-blue-900 flex items-center gap-2">
                 <CalendarIcon /> Session Activity
@@ -793,7 +1284,7 @@ export default function Home() {
                                                   <div className="text-base font-semibold text-teal-900">{m.customersServed}</div>
                                                 </div>
                                                 <div className="flex flex-col items-center">
-                                                  <div className="text-[11px] text-gray-600 font-medium">Correct beers served</div>
+                                                  <div className="text-xs text-gray-600 font-medium">Correct beers served</div>
                                                   <div className="text-base font-semibold text-teal-900">{m.correctBeersServed} / {m.customersServed}</div>
                                                 </div>
                                                 <div className="flex flex-col items-center">
@@ -818,129 +1309,6 @@ export default function Home() {
                 </div>
               </motion.div>
             </AnimatePresence>
-          </div>
-
-          {/* Right column: Module overview card */}
-          <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 min-h-[200px]">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Module overview</h3>
-            {(() => {
-              // Aggregate stats per module type from existing mock data
-              const byType = moduleTypes.map((type) => {
-                const items = modules.filter(m => m.moduleId === type);
-                const plays = items.length;
-                const uniqueSessions = new Set(items.map(m => m.sessionId)).size;
-                const completed = items.filter(m => m.status === 'completed').length;
-                const completion = plays > 0 ? Math.round((completed / plays) * 100) : 0;
-                const avgDurationMins = plays > 0 ? (items.reduce((s, m) => s + m.duration, 0) / plays) : 0;
-                const avgPlaysPerSession = uniqueSessions > 0 ? (plays / uniqueSessions) : 0;
-                // Highscores for Perfect Pour variants
-                let avgHighScore: number | null = null;
-                let maxHighScore: number | null = null;
-                let avgScoreImprovementPct: number | null = null;
-                if (type === 'Perfect Pour - The basics' || type === 'Perfect Pour - Masterclass') {
-                  const hs = items
-                    .map(m => (typeof m.challengeHighScore === 'number' ? m.challengeHighScore as number : null))
-                    .filter((v): v is number => v !== null);
-                  const avgTotals = items
-                    .map(m => (typeof m.averageTotal === 'number' ? m.averageTotal as number : null))
-                    .filter((v): v is number => v !== null);
-                  if (hs.length > 0) {
-                    avgHighScore = Math.round(hs.reduce((s, v) => s + v, 0) / hs.length);
-                    maxHighScore = Math.max(...hs);
-                  }
-                  if (avgHighScore !== null && avgTotals.length > 0) {
-                    const avgBaseline = avgTotals.reduce((s, v) => s + v, 0) / avgTotals.length;
-                    if (avgBaseline > 0) {
-                      avgScoreImprovementPct = Math.round(((avgHighScore / avgBaseline) - 1) * 100);
-                    }
-                  }
-                }
-                return { type, plays, uniqueSessions, completion, avgDurationMins, avgPlaysPerSession, avgHighScore, avgScoreImprovementPct, maxHighScore };
-              });
-              const gradientForType = (type: string) => {
-                if (type === 'Perfect Pour - The basics' || type === 'Perfect Pour - Masterclass') {
-                  return 'from-green-100 to-green-50';
-                }
-                if (type === 'Ingredients') {
-                  return 'from-amber-100 to-amber-50';
-                }
-                if (type === 'Beer types') {
-                  return 'from-blue-100 to-blue-50';
-                }
-                if (type === 'Tutorial') {
-                  return 'from-purple-100 to-purple-50';
-                }
-                return 'from-gray-100 to-gray-50';
-              };
-              const iconForType = (type: string) => {
-                if (type === 'Tutorial') return BookIcon;
-                if (type === 'Perfect Pour - The basics') return CheckmarkIcon;
-                if (type === 'Perfect Pour - Masterclass') return BarChartIcon;
-                if (type === 'Ingredients') return BeakerIcon;
-                if (type === 'Beer types') return FunStatsIcon;
-                return CheckmarkIcon;
-              };
-              // Desired display order for cards
-              const desiredOrder = [
-                'Perfect Pour - The basics',
-                'Perfect Pour - Masterclass',
-                'Ingredients',
-                'Beer types',
-                'Tutorial',
-              ];
-              const byTypeSorted = [...byType].sort((a, b) => desiredOrder.indexOf(a.type) - desiredOrder.indexOf(b.type));
-
-              return (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {byTypeSorted.map((row, idx) => {
-                    const GIcon = iconForType(row.type);
-                    return (
-                      <div
-                        key={row.type}
-                        className={`rounded-xl bg-gradient-to-r ${gradientForType(row.type)} p-5 shadow hover:shadow-lg transition`}
-                      >
-                        <div className="flex flex-col items-center text-center">
-                          <div className="mb-2">
-                            <GIcon />
-                          </div>
-                          <div className="text-sm font-semibold text-gray-900">{row.type}</div>
-                          <div className="mt-3 grid grid-cols-2 gap-2 w-full">
-                            <div className="bg-white/80 rounded-lg px-2 py-2">
-                              <div className="text-[11px] text-gray-600">Total times played</div>
-                              <div className="text-sm font-semibold text-gray-900">{row.plays}</div>
-                            </div>
-                            <div className="bg-white/80 rounded-lg px-2 py-2">
-                              <div className="text-[11px] text-gray-600">Completion rate</div>
-                              <div className="text-sm font-semibold text-gray-900">{row.completion}%</div>
-                            </div>
-                            <div className="bg-white/80 rounded-lg px-2 py-2">
-                              <div className="text-[11px] text-gray-600"><span>Avg<br/>duration</span></div>
-                              <div className="text-sm font-semibold text-gray-900">{formatDuration(row.avgDurationMins)}</div>
-                            </div>
-                            <div className="bg-white/80 rounded-lg px-2 py-2">
-                              <div className="text-[11px] text-gray-600">Avg plays per session</div>
-                              <div className="text-sm font-semibold text-gray-900">{row.avgPlaysPerSession.toFixed(2)}</div>
-                            </div>
-                            <div className="bg-white/80 rounded-lg px-2 py-2">
-                              <div className="text-[11px] text-gray-600"><span>Avg<br/>highscore</span></div>
-                              <div className="text-sm font-semibold text-gray-900">{row.avgHighScore !== null ? formatNumber(row.avgHighScore) : 'N / A'}</div>
-                            </div>
-                            <div className="bg-white/80 rounded-lg px-2 py-2">
-                              <div className="text-[11px] text-gray-600">Avg score improvement</div>
-                              <div className="text-sm font-semibold text-gray-900">{row.avgScoreImprovementPct !== null ? `${row.avgScoreImprovementPct}%` : 'N / A'}</div>
-                            </div>
-                            <div className="bg-white/80 rounded-lg px-2 py-2 col-span-2">
-                              <div className="text-[11px] text-gray-600">Global highscore</div>
-                              <div className="text-sm font-semibold text-gray-900">{row.maxHighScore !== null ? formatNumber(row.maxHighScore) : 'N / A'}</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
           </div>
         </div>
 
