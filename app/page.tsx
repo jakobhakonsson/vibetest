@@ -1,3 +1,4 @@
+ 
 "use client";
 
 import { useState } from "react";
@@ -35,7 +36,7 @@ const PaperPlaneIcon = () => (
 
 // Add CopilotIcon component near the other icon components
 const CopilotIcon = () => (
-  <svg className="w-6 h-6 text-blue-500 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+  <svg className="w-6 h-6 text-white mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2m0 14v2m9-9h-2M5 12H3m15.364-6.364l-1.414 1.414M6.05 17.95l-1.414 1.414m12.728 0l-1.414-1.414M6.05 6.05L4.636 4.636" />
     <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2" fill="none" />
   </svg>
@@ -259,8 +260,8 @@ export default function Home() {
 
   // Generate mock total sessions between 100-200
   const [totalSessions] = useState(() => getRandomInt(100, 200));
-  // Generate mock total modules played between 100-200 and split into completed/exited
-  const [totalModulesPlayed] = useState(() => getRandomInt(100, 200));
+  // Generate mock total modules played between 200-300 and split into completed/exited
+  const [totalModulesPlayed] = useState(() => getRandomInt(200, 300));
   const [modulesPlayedSplit] = useState(() => {
     const completed = getRandomInt(0, totalModulesPlayed);
     return [completed, totalModulesPlayed - completed];
@@ -273,10 +274,46 @@ export default function Home() {
   // Module rows show drilldown by default; no per-row toggle needed
   const [isLoading, setIsLoading] = useState(false);
   const [showAIResponse, setShowAIResponse] = useState(false);
+  // Date range for custom picking
+  const [customStartDate, setCustomStartDate] = useState<string>("");
+  const [customEndDate, setCustomEndDate] = useState<string>("");
+  const [showCalendar, setShowCalendar] = useState<boolean>(false);
+  const [pickerYear, setPickerYear] = useState<number>(new Date().getFullYear());
+  const [pickerMonth, setPickerMonth] = useState<number>(new Date().getMonth()); // 0-11
+  const formatYMD = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const buildMonthCells = (year: number, month: number) => {
+    const firstDow = new Date(year, month, 1).getDay(); // 0=Sun
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const cells: (string | null)[] = [];
+    for (let i = 0; i < firstDow; i++) cells.push(null);
+    for (let d = 1; d <= totalDays; d++) {
+      cells.push(formatYMD(new Date(year, month, d)));
+    }
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  };
+  const onDayClick = (key: string) => {
+    if (!customStartDate || (customStartDate && customEndDate)) {
+      setCustomStartDate(key);
+      setCustomEndDate("");
+    } else {
+      if (key < customStartDate) {
+        setCustomEndDate(customStartDate);
+        setCustomStartDate(key);
+      } else {
+        setCustomEndDate(key);
+      }
+    }
+  };
 
   // Generate mock fun stats for glasses broken and beer spilled
   const [funStats] = useState(() => ({
-    glassesBroken: getRandomInt(0, 8),
+    glassesBroken: getRandomInt(150, 250),
     beerSpilled: getRandomInt(0, 12)
   }));
 
@@ -284,15 +321,25 @@ export default function Home() {
   const [funFacts] = useState(() => {
     const virtualBeersPoured = getRandomInt(500, 2000);
     const beersServed = getRandomInt(400, virtualBeersPoured);
-    const glassesTouchingTap = getRandomInt(10, 120);
+    const glassesTouchingTap = getRandomInt(Math.max(0, Math.floor(totalSessions * 2)), Math.max(1, Math.floor(totalSessions * 3)));
     return { virtualBeersPoured, beersServed, glassesTouchingTap };
   });
 
   // Metrics
   const avgSessionDuration = sessions.reduce((acc, s) => acc + s.duration, 0) / sessions.length;
+  const longestSessionDuration = sessions.reduce((max, s) => Math.max(max, s.duration), 0);
+  const longestSessionDisplayMinutes = Math.max(longestSessionDuration, Math.ceil(avgSessionDuration) + 1);
   const totalModules = modules.length;
   const avgModuleDuration = modules.length > 0 ? modules.reduce((acc, m) => acc + m.duration, 0) / modules.length : 0;
+  const longestModuleDuration = modules.length > 0 ? modules.reduce((max, m) => Math.max(max, m.duration), 0) : 0;
+  const longestModuleDisplayMinutes = Math.max(longestModuleDuration, Math.ceil(avgModuleDuration) + 1);
+  const avgModulesPerSession = totalSessions > 0 ? totalModulesPlayed / totalSessions : 0;
   const completionRate = totalModules > 0 ? (completedModulesPlayed / totalModulesPlayed) * 100 : 0;
+  // Total time spent training across all sessions (minutes → hours, minutes)
+  const totalTrainingMinutes = Math.round(sessions.reduce((acc, s) => acc + s.duration, 0));
+  const totalTrainingHours = Math.floor(totalTrainingMinutes / 60);
+  const totalTrainingRemainderMinutes = totalTrainingMinutes % 60;
+  const totalTrainingDays = Math.floor(totalTrainingHours / 24);
 
   // Drilldown per module type
   const moduleTypes = Array.from(new Set(modules.map(m => m.moduleId)));
@@ -392,6 +439,26 @@ export default function Home() {
   const [headsetsReported] = useState(() => getRandomInt(50, 130));
   const headsetsReportedPct = Math.round((headsetsReported / 130) * 100);
 
+  // Stable line chart data (sessions per day and unique headsets) — generate once per reload
+  type ChartDay = { key: string; label: string; count: number };
+  const [chartDays] = useState<ChartDay[]>(() => {
+    const out: ChartDay[] = [];
+    for (let i = 0; i < 30; i++) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - (29 - i));
+      const label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      out.push({ key: d.toISOString().slice(0, 10), label, count: getRandomInt(0, 15) });
+    }
+    return out;
+  });
+  const [chartUniques] = useState<ChartDay[]>(() => chartDays.map(d => {
+    if (d.count === 0) return { ...d, count: 0 };
+    const minU = Math.max(0, Math.floor(d.count * 0.4));
+    const maxU = Math.max(0, d.count - 1);
+    return { ...d, count: getRandomInt(minU, maxU) };
+  }));
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 font-sans">
              {/* Header */}
@@ -416,36 +483,120 @@ export default function Home() {
 
       {/* Overview Title and Dropdown - moved to top */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2">
-        <div className="flex items-center gap-4 mb-2">
-          <h2 className="text-2xl font-bold text-gray-800">Overview</h2>
-          <div className="relative">
-            <select
-              className="appearance-none border border-blue-200 rounded-lg pl-4 pr-10 py-2 bg-white shadow focus:ring-2 focus:ring-blue-300 focus:border-blue-400 text-gray-800 font-medium transition-all duration-150"
-              defaultValue="30d"
-            >
-              <option value="24h">Last 24 hours</option>
-              <option value="30d">Last 30 days</option>
-              <option value="all">All time</option>
-              <option value="pick">Pick dates</option>
-            </select>
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-blue-400">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </span>
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 shadow-sm">
+          <div className="flex items-center gap-4 mb-3">
+            <h2 className="text-2xl font-bold text-gray-800">Show data from:</h2>
+            <div className="relative group">
+              <select
+                className="appearance-none rounded-full pl-4 pr-12 py-2 bg-white/95 border-2 border-blue-100 text-gray-800 font-medium shadow-sm hover:shadow focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-300 transition-colors duration-200 backdrop-blur"
+                value={selectedTimeframe}
+                onChange={(e) => setSelectedTimeframe((e.target as HTMLSelectElement).value)}
+              >
+                <option value="24h">Last 24 hours</option>
+                <option value="30d">Last 30 days</option>
+                <option value="all">All time</option>
+                <option value="pick">Pick dates</option>
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 group-focus-within:text-blue-600 transition-colors duration-200">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </span>
+            </div>
           </div>
+          <p className="text-sm text-gray-600">
+            {(() => {
+              const x = headsetsReported;
+              const y = headsetsReportedPct;
+              return (
+                <>
+                  Showing data reported from <span className="font-bold">{x}</span> out of 130 headsets. <span className="font-bold">{y}%</span>. Note that data may be unrepresentative if reported from only a few headsets.
+                </>
+              );
+            })()}
+          </p>
+          <AnimatePresence initial={false}>
+            {selectedTimeframe === 'pick' && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.35, ease: 'easeInOut' }}
+                className="mt-4 p-4 rounded-xl bg-white text-gray-900 border border-gray-200 shadow-lg"
+              >
+                <div className="mb-3 text-sm text-gray-600">Pick a date range</div>
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end mb-3">
+                  <div className="flex flex-col">
+                    <label className="text-xs font-semibold text-gray-700 mb-1">Start date</label>
+                    <input type="date" value={customStartDate} onChange={(e) => setCustomStartDate((e.target as HTMLInputElement).value)} className="px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-200 focus:border-blue-400" />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-xs font-semibold text-gray-700 mb-1">End date</label>
+                    <input type="date" value={customEndDate} onChange={(e) => setCustomEndDate((e.target as HTMLInputElement).value)} className="px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-200 focus:border-blue-400" />
+                  </div>
+                  <button type="button" onClick={() => setShowCalendar(v => !v)} className="h-10 px-3 rounded-lg border border-gray-300 hover:bg-gray-50 flex items-center gap-2 justify-center">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path strokeLinecap="round" strokeLinejoin="round" d="M16 2v4M8 2v4M3 10h18"/></svg>
+                    <span className="text-sm font-semibold text-gray-700">Calendar</span>
+                  </button>
+                </div>
+                <AnimatePresence initial={false}>
+                  {showCalendar && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      className="rounded-lg border border-gray-200 p-3"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-lg font-semibold">{new Date(pickerYear, pickerMonth).toLocaleString(undefined, { month: 'long', year: 'numeric' })}</div>
+                        <div className="flex items-center gap-2">
+                          <button className="p-2 rounded-md hover:bg-gray-100" onClick={() => { const m = new Date(pickerYear, pickerMonth - 1, 1); setPickerYear(m.getFullYear()); setPickerMonth(m.getMonth()); }}>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                          </button>
+                          <button className="p-2 rounded-md hover:bg-gray-100" onClick={() => { const m = new Date(pickerYear, pickerMonth + 1, 1); setPickerYear(m.getFullYear()); setPickerMonth(m.getMonth()); }}>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-7 gap-2 text-xs text-gray-500 mb-2">
+                        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (<div key={d} className="text-center">{d}</div>))}
         </div>
-        <p className="text-sm text-gray-600 mb-6">
-          {(() => {
-            const x = headsetsReported;
-            const y = headsetsReportedPct;
-            return (
-              <>
-                Showing data reported from <span className="font-bold">{x}</span> out of 130 headsets. <span className="font-bold">{y}%</span>. Note that data may be unrepresentative if reported from only a few headsets.
-              </>
-            );
-          })()}
-        </p>
+                      <div className="grid grid-cols-7 gap-2">
+                        {buildMonthCells(pickerYear, pickerMonth).map((key, idx) => {
+                          const isInRange = key && customStartDate && customEndDate && key >= customStartDate && key <= customEndDate;
+                          const isStart = key && key === customStartDate;
+                          const isEnd = key && key === customEndDate;
+                          return (
+                            <button
+                              key={idx}
+                              disabled={!key}
+                              onClick={() => key && onDayClick(key)}
+                              className={`h-9 rounded-md text-sm flex items-center justify-center ${!key ? 'opacity-0 cursor-default' : 'hover:bg-gray-100'} ${isInRange ? 'bg-emerald-50 text-emerald-700' : ''} ${isStart || isEnd ? 'bg-emerald-500 text-white hover:bg-emerald-600' : ''}`}
+                            >
+                              {key ? Number(key.split('-')[2]) : ''}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div className="text-gray-600">Start: <span className="font-semibold text-gray-900">{customStartDate || '-'}</span></div>
+                  <div className="text-gray-600">End: <span className="font-semibold text-gray-900">{customEndDate || '-'}</span></div>
+                </div>
+                {customStartDate && customEndDate && customEndDate < customStartDate && (
+                  <div className="text-sm text-red-600 mt-2">End date must be after start date</div>
+                )}
+                <div className="mt-4 flex items-center gap-2">
+                  <button className="px-4 py-2 rounded-lg bg-emerald-500 text-white font-semibold shadow hover:bg-emerald-600 active:scale-95">Apply</button>
+                  <button className="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 font-semibold shadow hover:bg-gray-200 active:scale-95" onClick={() => { setSelectedTimeframe('30d'); setShowCalendar(false); }}>Cancel</button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </section>
 
       {/* Overview Cards - moved to top */}
@@ -458,8 +609,8 @@ export default function Home() {
                 <CalendarIcon />
               </div>
               <div>
-                <h3 className="text-xs font-semibold text-blue-700 uppercase">Total Sessions</h3>
                 <p className="text-3xl font-bold text-blue-900">{totalSessions}</p>
+                <h3 className="text-xs font-semibold text-blue-700 uppercase mt-1">Total Sessions</h3>
               </div>
             </div>
             <div className="flex items-center gap-4 bg-gradient-to-r from-purple-100 to-purple-50 rounded-xl shadow hover:shadow-lg transition p-6">
@@ -467,9 +618,9 @@ export default function Home() {
                 <DurationIcon />
               </div>
               <div>
-                <h3 className="text-xs font-semibold text-purple-700 uppercase">Avg Session Duration</h3>
                 <p className="text-3xl font-bold text-purple-900">{avgSessionDuration.toFixed(1)}m</p>
-                <p className="text-xs text-purple-700 mt-1">{avgSessionDuration.toFixed(1)}m average</p>
+                <h3 className="text-xs font-semibold text-purple-700 uppercase mt-1">TRAINED ON AVERAGE PER SESSION</h3>
+                <p className="text-xs text-purple-700 mt-1">Longest: {longestSessionDisplayMinutes} minutes</p>
               </div>
             </div>
             <div className="flex items-center gap-4 bg-gradient-to-r from-green-100 to-green-50 rounded-xl shadow hover:shadow-lg transition p-6">
@@ -477,8 +628,9 @@ export default function Home() {
                 <CheckmarkIcon />
               </div>
               <div>
-                <h3 className="text-xs font-semibold text-green-700 uppercase">Total Modules Played</h3>
                 <p className="text-3xl font-bold text-green-900">{totalModulesPlayed}</p>
+                <h3 className="text-xs font-semibold text-green-700 uppercase mt-1">Total Modules Played</h3>
+                <p className="text-xs text-green-700 mt-1">Avg {avgModulesPerSession.toFixed(2)} modules per session</p>
               </div>
             </div>
             <div className="flex items-center gap-4 bg-gradient-to-r from-teal-100 to-teal-50 rounded-xl shadow hover:shadow-lg transition p-6">
@@ -486,12 +638,12 @@ export default function Home() {
                 <DurationIcon />
               </div>
               <div>
-                <h3 className="text-xs font-semibold text-teal-700 uppercase">Avg Module Duration</h3>
                 <p className="text-3xl font-bold text-teal-900">{avgModuleDuration.toFixed(1)}m</p>
-                <p className="text-xs text-teal-700 mt-1">{avgModuleDuration.toFixed(1)}m average</p>
+                <h3 className="text-xs font-semibold text-teal-700 uppercase mt-1">TRAINED ON AVERAGE PER MODULE</h3>
+                <p className="text-xs text-teal-700 mt-1">Longest: {Math.ceil(longestModuleDisplayMinutes)} minutes</p>
               </div>
             </div>
-          </div>
+        </div>
           {/* Right: Big card spanning height of two rows */}
           <div className="bg-white rounded-xl shadow p-6 min-h-[260px] lg:min-h-[100%] lg:col-span-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Average time share per session</h3>
@@ -574,15 +726,15 @@ export default function Home() {
       {/* Fun facts + Copilot Row */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <h2 className="text-xl font-bold text-gray-800 mb-4">Fun facts</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 lg:col-span-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 lg:col-span-1">
             <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
               <div className="hidden">
                 <FunStatsIcon />
               </div>
               <div>
-                <h3 className="text-xs font-semibold text-amber-700 uppercase">Virtual beers poured</h3>
                 <p className="text-3xl font-bold text-amber-900">{funFacts.virtualBeersPoured}</p>
+                <h3 className="text-xs font-semibold text-amber-700 uppercase mt-1">Virtual beers poured</h3>
               </div>
             </div>
             <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
@@ -590,8 +742,8 @@ export default function Home() {
                 <FunStatsIcon />
               </div>
               <div>
-                <h3 className="text-xs font-semibold text-violet-700 uppercase">Virtual customers served</h3>
                 <p className="text-3xl font-bold text-violet-900">{funFacts.beersServed}</p>
+                <h3 className="text-xs font-semibold text-violet-700 uppercase mt-1">Virtual customers served</h3>
               </div>
             </div>
             <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
@@ -599,8 +751,8 @@ export default function Home() {
                 <FunStatsIcon />
               </div>
               <div>
-                <h3 className="text-xs font-semibold text-cyan-700 uppercase">Glasses broken</h3>
                 <p className="text-3xl font-bold text-cyan-900">{funStats.glassesBroken}</p>
+                <h3 className="text-xs font-semibold text-cyan-700 uppercase mt-1">Glasses broken</h3>
               </div>
             </div>
             <div className="flex items-center gap-4 bg-white rounded-xl shadow hover:shadow-lg transition p-6">
@@ -608,60 +760,59 @@ export default function Home() {
                 <FunStatsIcon />
               </div>
               <div>
-                <h3 className="text-xs font-semibold text-indigo-700 uppercase">Glasses touching the tap</h3>
-                <p className="text-3xl font-bold text-indigo-900">{funFacts.glassesTouchingTap}</p>
+                <p className="text-3xl font-bold text-indigo-900">{totalTrainingHours} h, {totalTrainingRemainderMinutes} m</p>
+                <h3 className="text-xs font-semibold text-indigo-700 uppercase mt-1">Spent training. That's over {totalTrainingDays} days!</h3>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center min-h-[200px] justify-center w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center justify-center">
-              <CopilotIcon /> Copilot
-            </h3>
-            <div className="w-full space-y-3">
-              {!showAIResponse ? (
-                <>
-                  <textarea
-                    className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 placeholder-gray-600 text-gray-900"
-                    placeholder="Ask questions about your data, and have CoPilot answer and visualize."
-                    rows={4}
-                  />
-                  <button
-                    className={`w-full flex items-center justify-center gap-2 font-semibold py-3 px-4 rounded-xl transition-all shadow-md text-white text-base
-                      ${isLoading
-                        ? 'bg-gray-400 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-blue-500 to-teal-400 hover:from-blue-600 hover:to-teal-500 active:scale-95'}
-                    `}
-                    onClick={() => {
-                      if (!isLoading) {
-                        setIsLoading(true);
-                        setTimeout(() => {
-                          setIsLoading(false);
-                          setShowAIResponse(true);
-                        }, 2000);
-                      }
-                    }}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center">
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Loading...
-                      </div>
-                    ) : (
-                      'Send'
-                    )}
-                  </button>
-                </>
-              ) : (
-                <div className="w-full p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-gray-700 text-sm leading-relaxed">
-                    Sure! I will do that as soon as AI has been implemented. I'm just a dummy for now. One day I will grow up to be a real AI
-                  </p>
-                </div>
-              )}
+          <div className="relative rounded-xl overflow-hidden w-full lg:col-span-1 h-full flex">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-teal-500 to-emerald-400"></div>
+            <div className="relative p-6 flex flex-col justify-between h-full w-full">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center justify-center">
+                <CopilotIcon /> Copilot
+              </h3>
+              <div className="w-full space-y-3">
+                {!showAIResponse ? (
+                  <>
+                    <textarea
+                      className="w-full p-3 rounded-lg resize-none focus:ring-2 focus:ring-white/70 focus:border-white/60 placeholder-gray-600 text-gray-900 bg-white border border-white/50"
+                      placeholder="Ask questions about your data, and have CoPilot answer and visualize."
+                      rows={4}
+                    />
+                    <button
+                      className={`w-full flex items-center justify-center gap-2 font-semibold py-3 px-4 rounded-xl transition-all shadow-lg text-blue-900 text-base ${isLoading ? 'bg-white/60 cursor-not-allowed' : 'bg-white hover:bg-white/90 active:scale-95'}`}
+                      onClick={() => {
+                        if (!isLoading) {
+                          setIsLoading(true);
+                          setTimeout(() => {
+                            setIsLoading(false);
+                            setShowAIResponse(true);
+                          }, 2000);
+                        }
+                      }}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <div className="flex items-center justify-center">
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Loading...
+                        </div>
+                      ) : (
+                        'Send'
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <div className="w-full p-4 bg-white/90 border border-white/60 rounded-lg shadow">
+                    <p className="text-blue-900 text-sm leading-relaxed">
+                      Sure! I will do that as soon as AI has been implemented. I'm just a dummy for now. One day I will grow up to be a real AI
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -711,7 +862,7 @@ export default function Home() {
 
       {/* Module Overview Section - moved to its own section before Session Activity */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Module Overview</h2>
+        <h2 className="text-xl font-bold text-gray-800 mb-4">Module Comparison</h2>
         <div className="bg-white rounded-2xl shadow-lg p-6">
           {(() => {
             // Aggregate stats per module type from existing mock data
@@ -744,6 +895,14 @@ export default function Home() {
                     avgScoreImprovementPct = Math.round(((avgHighScore / avgBaseline) - 1) * 100);
                   }
                 }
+              } else if (type === 'Ingredients') {
+                // Mock highscores for Ingredients similar to other modules
+                const base = 42000;
+                const jitter = Math.floor(Math.random() * 8000) - 4000; // ±4,000
+                avgHighScore = base + jitter;
+                const extra = Math.floor(Math.random() * 6000) + 2000; // +2,000–7,999
+                maxHighScore = (avgHighScore as number) + extra;
+                avgScoreImprovementPct = Math.floor(Math.random() * 21) + 5; // 5–25%
               } else if (type === 'Beer types') {
                 // Mock highscores for Beer types similar scale to Perfect Pour
                 const base = 50000;
@@ -754,7 +913,25 @@ export default function Home() {
                 // optional improvement metric even if not displayed
                 avgScoreImprovementPct = Math.floor(Math.random() * 21) + 5; // 5–25%
               }
-              return { type, plays, uniqueSessions, completion, avgDurationMins, avgPlaysPerSession, avgHighScore, avgScoreImprovementPct, maxHighScore };
+              // Intro/challenge mock percentages
+              // Rule: exactly one of the two should be 100% (randomized per reload per card)
+              let introPct = 0;
+              let challengePct = 0;
+              if (type === 'Tutorial') {
+                // Tutorial handled as N/A in UI; set to 0 placeholders
+                introPct = 0;
+                challengePct = 0;
+              } else {
+                const makeIntroFull = Math.random() < 0.5;
+                if (makeIntroFull) {
+                  introPct = 100;
+                  challengePct = Math.min(99, getRandomInt(10, 95));
+                } else {
+                  challengePct = 100;
+                  introPct = Math.min(99, getRandomInt(40, 95));
+                }
+              }
+              return { type, plays, uniqueSessions, completion, avgDurationMins, avgPlaysPerSession, avgHighScore, avgScoreImprovementPct, maxHighScore, introPct, challengePct };
             });
             const gradientForType = (type: string) => {
               if (type === 'Perfect Pour - The basics' || type === 'Perfect Pour - Masterclass') {
@@ -779,13 +956,13 @@ export default function Home() {
               if (type === 'Beer types') return FunStatsIcon;
               return CheckmarkIcon;
             };
-            // Desired display order for cards
+            // Desired display order for cards (Tutorial first)
             const desiredOrder = [
+              'Tutorial',
               'Perfect Pour - The basics',
               'Perfect Pour - Masterclass',
               'Ingredients',
               'Beer types',
-              'Tutorial',
             ];
             const byTypeSorted = [...byType].sort((a, b) => desiredOrder.indexOf(a.type) - desiredOrder.indexOf(b.type));
 
@@ -830,6 +1007,66 @@ export default function Home() {
                                );
                              })()}
                            </div>
+                           {/* Played introduction */}
+                           <div className="bg-white/80 rounded-lg px-2 py-2 col-span-1">
+                             {(() => {
+                               if (row.type === 'Tutorial') {
+                                 return (
+                                   <div className="flex items-center justify-center h-16">
+                                     <span className="text-sm font-semibold text-gray-700">N/A</span>
+                                   </div>
+                                 );
+                               }
+                               const pct = Math.max(0, Math.min(100, row.introPct ?? getRandomInt(40, 95)));
+                               const radius = 24;
+                               const circumference = 2 * Math.PI * radius;
+                               const dashoffset = circumference * (1 - pct / 100);
+                               return (
+                                 <div className="flex flex-col items-center justify-center gap-1">
+                                   <div className="relative w-14 h-14">
+                                     <svg className="w-14 h-14 transform -rotate-90" viewBox="0 0 64 64">
+                                       <circle cx="32" cy="32" r={radius} stroke="currentColor" strokeWidth="4" fill="none" className="text-gray-200" />
+                                       <circle cx="32" cy="32" r={radius} stroke="currentColor" strokeWidth="4" fill="none" className="text-blue-500" strokeDasharray={`${circumference}`} strokeDashoffset={`${dashoffset}`} strokeLinecap="round" />
+                                     </svg>
+                                     <div className="absolute inset-0 flex items-center justify-center">
+                                       <span className="text-xs font-semibold text-gray-700">{pct}%</span>
+                                     </div>
+                                   </div>
+                                   <div className="text-xs text-gray-700 font-medium">played introduction</div>
+                                 </div>
+                               );
+                             })()}
+                           </div>
+                           {/* Played challenge */}
+                           <div className="bg-white/80 rounded-lg px-2 py-2 col-span-1">
+                             {(() => {
+                               if (row.type === 'Tutorial') {
+                                 return (
+                                   <div className="flex items-center justify-center h-16">
+                                     <span className="text-sm font-semibold text-gray-700">N/A</span>
+                                   </div>
+                                 );
+                               }
+                               const pct = Math.max(0, Math.min(100, row.challengePct ?? getRandomInt(10, 70)));
+                               const radius = 24;
+                               const circumference = 2 * Math.PI * radius;
+                               const dashoffset = circumference * (1 - pct / 100);
+                               return (
+                                 <div className="flex flex-col items-center justify-center gap-1">
+                                   <div className="relative w-14 h-14">
+                                     <svg className="w-14 h-14 transform -rotate-90" viewBox="0 0 64 64">
+                                       <circle cx="32" cy="32" r={radius} stroke="currentColor" strokeWidth="4" fill="none" className="text-gray-200" />
+                                       <circle cx="32" cy="32" r={radius} stroke="currentColor" strokeWidth="4" fill="none" className="text-emerald-500" strokeDasharray={`${circumference}`} strokeDashoffset={`${dashoffset}`} strokeLinecap="round" />
+                                     </svg>
+                                     <div className="absolute inset-0 flex items-center justify-center">
+                                       <span className="text-xs font-semibold text-gray-700">{pct}%</span>
+                                     </div>
+                                   </div>
+                                   <div className="text-xs text-gray-700 font-medium">played challenge</div>
+                                 </div>
+                               );
+                             })()}
+                           </div>
                            <div className="bg-white/80 rounded-lg px-2 py-2 col-span-2">
                              <div className="text-[11px] text-gray-600"><span>Avg<br/>highscore</span></div>
                              <div className="text-sm font-semibold text-gray-900">{row.avgHighScore !== null ? formatNumber(row.avgHighScore) : 'N / A'}</div>
@@ -851,9 +1088,8 @@ export default function Home() {
 
                                {/* New Spreadsheet-style Module Data Section */}
          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-           <h2 className="text-xl font-bold text-gray-800 mb-4">Module Data Spreadsheet</h2>
            
-           <div className="bg-white shadow-lg p-6 overflow-x-auto">
+           <div className="bg-white rounded-xl shadow p-6 overflow-x-auto">
              {(() => {
               // Aggregate stats per module type from existing mock data
               const [byType] = useState(() => moduleTypes.map((type) => {
@@ -957,7 +1193,7 @@ export default function Home() {
                 }));
 
                return (
-                 <div className="rounded-xl border border-gray-200 overflow-hidden shadow-lg">
+                 <div className="overflow-hidden">
                    <table className="min-w-full border-separate border-spacing-x-4 border-spacing-y-0">
                      <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
                        <tr>
@@ -1149,13 +1385,87 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        {/* Latest reported headset activity */}
+        <section className="mb-10">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">Latest reported headset activity</h2>
+          <div className="bg-white rounded-2xl shadow p-6 w-full">
+            {(() => {
+              const days = chartDays;
+              const width = 960;
+              const height = 260;
+              const pad = 32;
+              const innerW = width - pad * 2;
+              const innerH = height - pad * 2;
+              const maxY = 15; // fixed axis 0–15
+              const x = (i: number) => pad + (i * innerW) / (days.length - 1);
+              const y = (v: number) => height - pad - (v / maxY) * innerH;
+              // Secondary series: unique headsets (stable per reload)
+              const uniques = chartUniques;
+              // Build paths
+              let path = '';
+              let pathU = '';
+              days.forEach((pt, i) => {
+                const cx = x(i);
+                const cy = y(pt.count);
+                path += i === 0 ? `M ${cx} ${cy}` : ` L ${cx} ${cy}`;
+                const cyU = y(uniques[i].count);
+                pathU += i === 0 ? `M ${cx} ${cyU}` : ` L ${cx} ${cyU}`;
+              });
+              const yTicks = 5;
+              const xLabelEvery = 5;
+              return (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-gray-600">Sessions started (last 30 days)</div>
+                    <div className="hidden sm:flex items-center gap-4 text-xs text-gray-600">
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded bg-blue-500"></span> Sessions</div>
+                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded bg-emerald-500"></span> Unique headsets</div>
+                    </div>
+                  </div>
+                  <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[260px] select-none">
+                    <rect x="0" y="0" width={width} height={height} fill="transparent" />
+                    {Array.from({ length: yTicks + 1 }, (_, i) => {
+                      const ratio = i / yTicks;
+                      const gy = pad + ratio * innerH;
+                      const val = Math.round(maxY * (1 - ratio));
+                      return (
+                        <g key={`gy-${i}`}> 
+                          <line x1={pad} y1={gy} x2={width - pad} y2={gy} stroke="#e5e7eb" strokeWidth="1" />
+                          <text x={pad - 8} y={gy + 4} textAnchor="end" fontSize="10" fill="#6b7280">{val}</text>
+                        </g>
+                      );
+                    })}
+                    <line x1={pad} y1={height - pad} x2={width - pad} y2={height - pad} stroke="#e5e7eb" strokeWidth="1.25" />
+                    <path d={path} fill="none" stroke="#3b82f6" strokeWidth="2.75" />
+                    <path d={pathU} fill="none" stroke="#10b981" strokeWidth="2.25" />
+                    {days.map((pt, i) => (
+                      <circle key={`pt-${pt.key}`} cx={x(i)} cy={y(pt.count)} r={5} fill="#3b82f6" style={{ cursor: 'pointer' }}>
+                        <title>{`${pt.label}: ${pt.count} sessions`}</title>
+                      </circle>
+                    ))}
+                    {uniques.map((pt, i) => (
+                      <circle key={`pu-${pt.key}`} cx={x(i)} cy={y(pt.count)} r={4} fill="#10b981" style={{ cursor: 'pointer' }}>
+                        <title>{`${pt.label}: ${pt.count} unique headsets`}</title>
+                      </circle>
+                    ))}
+                    {days.map((pt, i) => (
+                      i % xLabelEvery === 0 ? (
+                        <text key={`xl-${pt.key}`} x={x(i)} y={height - pad + 16} textAnchor="middle" fontSize="10" fill="#6b7280">{pt.label}</text>
+                      ) : null
+                    ))}
+                  </svg>
+                </>
+              );
+            })()}
+          </div>
+        </section>
         {/* Section: Activity */}
         <div className="mb-10">
           {/* Session Activity */}
           <div className="bg-gray-50 rounded-2xl shadow-lg p-6 hover:bg-gray-100 transition">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-blue-900 flex items-center gap-2">
-                <CalendarIcon /> Session Activity
+                <CalendarIcon /> Latest sessions
               </h3>
               <button
                 className="flex items-center px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs transition-colors"

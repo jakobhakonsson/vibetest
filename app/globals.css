@@ -25,6 +25,15 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Hide native date input calendar icons (Edge/Chromium-based) */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+input[type="date"]::-ms-clear,
+input[type="date"]::-ms-reveal {
+  display: none;
+}
+
 /* Narrow bar width utility for spreadsheet bars */
 .bar-narrow {
   width: 33.333333%; /* w-1/3 */
