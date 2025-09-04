@@ -467,8 +467,7 @@ export default function Home() {
   const completedModulesPlayed = modulesPlayedSplit[0];
   const exitedModulesPlayed = modulesPlayedSplit[1];
   const [selectedTimeframe, setSelectedTimeframe] = useState("24h");
-  const [showAllSessions, setShowAllSessions] = useState(false);
-  const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
+  // Removed: showAllSessions and expandedSessions (used by hidden Recent Sessions section)
   // Module rows show drilldown by default; no per-row toggle needed
   const [isLoading, setIsLoading] = useState(false);
   const [showAIResponse, setShowAIResponse] = useState(false);
@@ -774,13 +773,7 @@ export default function Home() {
     );
   };
 
-  // In Session Activity, sort sessions by descending session number (most recent first)
-  const sortedSessions = [...sessions].sort((a, b) => {
-    // Extract the numeric part from the session id (e.g., 'session-120' -> 120)
-    const numA = parseInt(a.id.replace('session-', ''), 10);
-    const numB = parseInt(b.id.replace('session-', ''), 10);
-    return numB - numA;
-  });
+  // Removed: sortedSessions (used by hidden Recent Sessions section)
 
   // Pie chart helpers for the right big card
   const pieColors = ["#60A5FA", "#34D399", "#FBBF24", "#A78BFA", "#F472B6"]; // blue, green, amber, purple, pink
@@ -1696,263 +1689,37 @@ export default function Home() {
       */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* ========================================================================
-            ACTIVITY TRENDS CHART
+            ACTIVITY TRENDS CHART - HIDDEN FOR DEMO
             ========================================================================
-            Displays a line chart showing session activity over the last 30 days.
+            This section is temporarily hidden before demoing and might be brought back later.
+            It displays a line chart showing session activity over the last 30 days.
             This helps users understand usage patterns and trends.
         */}
+        {/* Activity Trends section temporarily hidden for demo
         <section className="mb-10">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Activity Trends</h2>
           <div className="bg-white rounded-2xl shadow p-6 w-full">
-            {(() => {
-              // ====================================================================
-              // CHART DIMENSIONS AND SCALING
-              // ====================================================================
-              // We define the chart dimensions and create scaling functions to
-              // convert data values into pixel coordinates on the SVG canvas.
-              
-              const days = chartDays;
-              const width = 960;        // Total chart width in pixels
-              const height = 260;       // Total chart height in pixels
-              const pad = 32;           // Padding around the chart (space for labels)
-              const innerW = width - pad * 2;  // Usable width (minus padding)
-              const innerH = height - pad * 2; // Usable height (minus padding)
-              const maxY = 15;          // Maximum value on Y-axis (sessions per day)
-              
-              // Convert data index to X coordinate (horizontal position)
-              const x = (i: number) => pad + (i * innerW) / (days.length - 1);
-              
-              // Convert data value to Y coordinate (vertical position)
-              // Higher values appear higher on the chart (inverted Y-axis)
-              const y = (v: number) => height - pad - (v / maxY) * innerH;
-              // Secondary series: unique headsets (stable per reload)
-              const uniques = chartUniques;
-              
-              // ====================================================================
-              // SVG PATH BUILDING
-              // ====================================================================
-              // We build SVG path strings to draw the line charts.
-              // Each path represents a connected line through all data points.
-              
-              let path = '';      // Path for sessions per day
-              let pathU = '';     // Path for unique headsets
-              days.forEach((pt, i) => {
-                const cx = x(i);
-                const cy = y(pt.count);
-                path += i === 0 ? `M ${cx} ${cy}` : ` L ${cx} ${cy}`;
-                const cyU = y(uniques[i].count);
-                pathU += i === 0 ? `M ${cx} ${cyU}` : ` L ${cx} ${cyU}`;
-              });
-              const yTicks = 5;
-              const xLabelEvery = 5;
-              return (
-                <>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm text-gray-600">Sessions started (last 30 days)</div>
-                    <div className="hidden sm:flex items-center gap-4 text-xs text-gray-600">
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded bg-blue-500"></span> Sessions</div>
-                      <div className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded bg-emerald-500"></span> Unique headsets</div>
-                    </div>
-                  </div>
-                  <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[260px] select-none">
-                    <rect x="0" y="0" width={width} height={height} fill="transparent" />
-                    {Array.from({ length: yTicks + 1 }, (_, i) => {
-                      const ratio = i / yTicks;
-                      const gy = pad + ratio * innerH;
-                      const val = Math.round(maxY * (1 - ratio));
-                      return (
-                        <g key={`gy-${i}`}> 
-                          <line x1={pad} y1={gy} x2={width - pad} y2={gy} stroke="#e5e7eb" strokeWidth="1" />
-                          <text x={pad - 8} y={gy + 4} textAnchor="end" fontSize="10" fill="#6b7280">{val}</text>
-                        </g>
-                      );
-                    })}
-                    <line x1={pad} y1={height - pad} x2={width - pad} y2={height - pad} stroke="#e5e7eb" strokeWidth="1.25" />
-                    <path d={path} fill="none" stroke="#3b82f6" strokeWidth="2.75" />
-                    <path d={pathU} fill="none" stroke="#10b981" strokeWidth="2.25" />
-                    {days.map((pt, i) => (
-                      <circle key={`pt-${pt.key}`} cx={x(i)} cy={y(pt.count)} r={5} fill="#3b82f6" style={{ cursor: 'pointer' }}>
-                        <title>{`${pt.label}: ${pt.count} sessions`}</title>
-                      </circle>
-                    ))}
-                    {uniques.map((pt, i) => (
-                      <circle key={`pu-${pt.key}`} cx={x(i)} cy={y(pt.count)} r={4} fill="#10b981" style={{ cursor: 'pointer' }}>
-                        <title>{`${pt.label}: ${pt.count} unique headsets`}</title>
-                      </circle>
-                    ))}
-                    {days.map((pt, i) => (
-                      i % xLabelEvery === 0 ? (
-                        <text key={`xl-${pt.key}`} x={x(i)} y={height - pad + 16} textAnchor="middle" fontSize="10" fill="#6b7280">{pt.label}</text>
-                      ) : null
-                    ))}
-                  </svg>
-                </>
-              );
-            })()}
+            Chart content here...
           </div>
         </section>
-        {/* Recent Sessions Section */}
+        */}
+        
+        {/* Recent Sessions Section - HIDDEN FOR DEMO */}
+        {/* 
         <div className="mb-10">
-          {/* Session Activity */}
           <div className="bg-gray-50 rounded-2xl shadow-lg p-6 hover:bg-gray-100 transition">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-blue-900 flex items-center gap-2">
                 <CalendarIcon /> Recent Sessions
               </h3>
-              <button
-                className="flex items-center px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs transition-colors"
-                onClick={() => setShowAllSessions(v => !v)}
-              >
-                {showAllSessions ? "See less" : "See more"}
-                <ChevronIcon expanded={showAllSessions} colorClass="text-blue-700" />
-              </button>
+              <button>See more</button>
             </div>
-            <AnimatePresence initial={false}>
-              <motion.div
-                key={showAllSessions ? 'expanded' : 'collapsed'}
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.5, ease: 'easeInOut' }}
-                className="overflow-hidden"
-              >
-                <div className="space-y-4">
-                  {(showAllSessions ? sortedSessions : sortedSessions.slice(0, 5)).map((session) => {
-                    const isExpanded = !!expandedSessions[session.id];
-                    const sessionModules = modules.filter(m => m.sessionId === session.id);
-                    return (
-                      <div
-                        key={session.id}
-                        className="border-l-4 border-[#4AB2AC] pl-4 pr-6 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition cursor-pointer"
-                        onClick={() => setExpandedSessions(prev => ({ ...prev, [session.id]: !prev[session.id] }))}
-                      >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium text-gray-900">Session <span className="font-mono">{session.id.replace('session-', '')}</span></p>
-                            <p className="text-xs text-gray-500">Device: {session.deviceId} | App: {session.appId}</p>
-                            <p className="text-xs text-gray-500">Start: {formatTime(session.startTime)}</p>
-                          </div>
-                          <div className="text-right min-w-[120px]">
-                            <p className="text-xs text-gray-500">Duration: {formatDuration(session.duration)}</p>
-                            <Bar value={session.duration} max={avgSessionDuration} color="bg-[#4AB2AC]" />
-                          </div>
-                        </div>
-                        <AnimatePresence initial={false}>
-                          {isExpanded && (
-                            <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: 'auto', opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.35, ease: 'easeInOut' }}
-                              className="overflow-hidden"
-                            >
-                              <div className="mt-3 pl-1">
-                                <div className="text-xs font-semibold text-blue-900 mb-2">Modules played in this session</div>
-                                <div className="flex flex-col space-y-3 bg-white/60 rounded-md">
-                                  {sessionModules.length === 0 ? (
-                                    <div className="text-xs text-gray-500 px-3 py-2">No modules recorded</div>
-                                  ) : (
-                                    sessionModules.map((m) => {
-                                      const isPerfectPour = m.moduleId === "Perfect Pour - The basics" || m.moduleId === "Perfect Pour - Masterclass";
-                                      const isBeerTypes = m.moduleId === "Beer types";
-                                      return (
-                                        <div key={m.id} className={`px-4 py-3 rounded bg-gray-50 border-2 border-gray-200 border-l-4 border-l-gray-300`}>
-                                          <div className="flex items-start justify-between">
-                                            <div className="flex flex-col gap-1">
-                                              <span className="text-sm text-gray-800 font-semibold">{m.moduleId}</span>
-                                              <div className="flex items-center gap-1">
-                                                <span className="text-xs text-gray-700">Duration: {formatDuration(m.duration)}</span>
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-gray-100 text-gray-600 border border-gray-200">{formatTimeHMS(m.startTime)} <span className="mx-1">→</span>{formatTimeHMS(m.endTime)}</span>
-                                              </div>
-                                            </div>
-                                            <div className="flex items-start">
-                                              <StatusBadge status={m.status} />
-                                            </div>
-                                          </div>
-                                          {isPerfectPour && (
-                                            <motion.div
-                                              initial={{ height: 0, opacity: 0 }}
-                                              animate={{ height: 'auto', opacity: 1 }}
-                                              transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                              className="overflow-hidden"
-                                            >
-                                              {(() => {
-                                                const pours = [
-                                                  m.averageScorePour1 || 0,
-                                                  m.averageScorePour2 || 0,
-                                                  m.averageScorePour3 || 0,
-                                                  m.averageScorePour4 || 0,
-                                                  m.averageScorePour5 || 0,
-                                                ];
-                                                const maxVal = Math.max(1, ...pours);
-                                                return (
-                                                  <div className="mt-2">
-                                                    <div className="p-3 rounded-md bg-gray-50">
-                                                      <div className="flex items-start gap-4">
-                                                        <div className="text-xs text-gray-700 font-medium leading-snug w-40">
-                                                          Score of beers poured in challenge
-                                                        </div>
-                                                        <div className="h-24 flex items-end gap-3">
-                                                          {pours.map((val, idx) => (
-                                                            <div key={idx} className="flex flex-col items-center w-10">
-                                                              <div className="text-[10px] text-gray-600 mb-1 font-semibold">{val}</div>
-                                                              <div className="w-full h-16 bg-gray-100 rounded flex items-end">
-                                                                <div
-                                                                  className="w-full rounded-t"
-                                                                  style={{ height: `${Math.max(6, Math.round((val / maxVal) * 100))}%`, backgroundColor: '#4AB2AC' }}
-                                                                ></div>
-                                                              </div>
-                                                              <div className="text-[10px] text-gray-500 mt-1">{idx + 1}</div>
-                                                            </div>
-                                                          ))}
-                                                        </div>
-                                                      </div>
-                                                    </div>
-                                                  </div>
-                                                );
-                                              })()}
-                                            </motion.div>
-                                          )}
-                                          {isBeerTypes && (
-                                            <motion.div
-                                              initial={{ height: 0, opacity: 0 }}
-                                              animate={{ height: 'auto', opacity: 1 }}
-                                              transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                              className="overflow-hidden"
-                                            >
-                                              <div className="mt-2 p-3 rounded-md bg-gray-50 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                                <div className="flex flex-col items-center">
-                                                  <div className="text-[11px] text-gray-600 font-medium">Customers served</div>
-                                                  <div className="text-base font-semibold text-teal-900">{m.customersServed}</div>
-                                                </div>
-                                                <div className="flex flex-col items-center">
-                                                  <div className="text-xs text-gray-600 font-medium">Correct beers served</div>
-                                                  <div className="text-base font-semibold text-teal-900">{m.correctBeersServed} / {m.customersServed}</div>
-                                                </div>
-                                                <div className="flex flex-col items-center">
-                                                  <div className="text-[11px] text-gray-600 font-medium">Score</div>
-                                                  <div className="text-base font-semibold text-teal-900">{m.status === 'completed' ? m.beerTypesScore : 'N / A'}</div>
-                                                </div>
-                                              </div>
-                                            </motion.div>
-                                          )}
-                                        </div>
-                                      );
-                                    })
-                                  )}
-                                </div>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            </AnimatePresence>
+            <div className="space-y-4">
+              Recent sessions content here...
+            </div>
           </div>
         </div>
+        */}
 
         {/* Section: Details - previously contained Session/Module panels (now removed) */}
       </main>
