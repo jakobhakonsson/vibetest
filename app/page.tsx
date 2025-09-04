@@ -6,15 +6,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 
 // SVG Icon components
-const SessionIcon = () => (
-  <svg className="w-7 h-7 text-blue-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" /></svg>
-);
-const DurationIcon = () => (
-  <svg className="w-7 h-7 text-purple-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" /></svg>
-);
-const ModuleIcon = () => (
-  <svg className="w-7 h-7 text-green-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h8" /></svg>
-);
+// deleted: SessionIcon, DurationIcon, ModuleIcon (unused)
 
 // Chevron icon component
 const ChevronIcon = ({ expanded, colorClass }: { expanded: boolean; colorClass: string }) => (
@@ -29,10 +21,7 @@ const ChevronIcon = ({ expanded, colorClass }: { expanded: boolean; colorClass: 
   </svg>
 );
 
-// Add PaperPlaneIcon component near the other icon components
-const PaperPlaneIcon = () => (
-  <svg className="w-5 h-5 mr-2 -ml-1" fill="currentColor" viewBox="0 0 20 20"><path d="M2.94 2.94a1.5 1.5 0 012.12 0l12 12a1.5 1.5 0 01-2.12 2.12l-3.39-3.39-2.3 2.3a1 1 0 01-1.7-.7V13.4l-3.39-3.39a1.5 1.5 0 010-2.12l12-12z" /></svg>
-);
+// deleted: PaperPlaneIcon (unused)
 
 // Add CopilotIcon component near the other icon components
 const CopilotIcon = () => (
@@ -334,7 +323,7 @@ export default function Home() {
   const longestModuleDuration = modules.length > 0 ? modules.reduce((max, m) => Math.max(max, m.duration), 0) : 0;
   const longestModuleDisplayMinutes = Math.max(longestModuleDuration, Math.ceil(avgModuleDuration) + 1);
   const avgModulesPerSession = totalSessions > 0 ? totalModulesPlayed / totalSessions : 0;
-  const completionRate = totalModules > 0 ? (completedModulesPlayed / totalModulesPlayed) * 100 : 0;
+  // removed: completionRate was unused
   // Total time spent training across all sessions (minutes → hours, minutes)
   const totalTrainingMinutes = Math.round(sessions.reduce((acc, s) => acc + s.duration, 0));
   const totalTrainingHours = Math.floor(totalTrainingMinutes / 60);
@@ -615,7 +604,8 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-4 bg-gradient-to-r from-purple-100 to-purple-50 rounded-xl shadow hover:shadow-lg transition p-6">
               <div className="bg-purple-200 rounded-full p-2">
-                <DurationIcon />
+                {/* DurationIcon removed in cleanup; using BarChartIcon as placeholder */}
+                <BarChartIcon />
               </div>
               <div>
                 <p className="text-3xl font-bold text-purple-900">{avgSessionDuration.toFixed(1)}m</p>
@@ -635,7 +625,8 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-4 bg-gradient-to-r from-teal-100 to-teal-50 rounded-xl shadow hover:shadow-lg transition p-6">
               <div className="bg-teal-200 rounded-full p-2">
-                <DurationIcon />
+                {/* DurationIcon removed in cleanup; using CheckmarkIcon as placeholder */}
+                <CheckmarkIcon />
               </div>
               <div>
                 <p className="text-3xl font-bold text-teal-900">{avgModuleDuration.toFixed(1)}m</p>
@@ -1622,8 +1613,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Section: Details */}
-        {/* Removed Session Details and Module Details panels as requested */}
+        /* Section: Details - previously contained Session/Module panels (now removed) */
       </main>
     </div>
   );
