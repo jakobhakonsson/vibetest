@@ -40,3 +40,19 @@ input[type="date"]::-ms-reveal {
   margin-left: auto; /* center */
   margin-right: auto; /* center */
 }
+
+/* Chart container utility for consistent bar chart styling */
+.chart-container {
+  background: transparent;
+  border-radius: 0.5rem; /* rounded-lg */
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Chart width utility for consistent bar chart sizing */
+.chart-width {
+  width: 100%;
+  max-width: 120px; /* 30rem */
+}
