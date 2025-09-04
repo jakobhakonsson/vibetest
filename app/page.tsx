@@ -221,6 +221,57 @@ const PerfectPourMasterclassIcon = () => (
 );
 
 
+// ============================================================================
+// OVERVIEW METRICS ICON COMPONENTS
+// ============================================================================
+// These icons are used in the main overview cards at the top of the dashboard
+
+/**
+ * Headset icon for Total Sessions - represents VR headset usage
+ * Features a VR headset design in blue
+ */
+const HeadsetIcon = () => (
+  <svg className="w-8 h-8" viewBox="0 0 60 37" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1.72656" y="1.38525" width="56" height="33.9155" rx="15.6653" stroke="#3279D3" strokeWidth="2.57685"/>
+    <rect x="28.0521" y="19.2874" width="3.97934" height="9.50046" rx="1.98967" stroke="#3279D3" strokeWidth="1.93616"/>
+    <rect x="37.9095" y="19.2874" width="3.97934" height="9.50046" rx="1.98967" stroke="#3279D3" strokeWidth="1.93616"/>
+    <path d="M19.7881 19.2871C20.8868 19.2873 21.7773 20.1786 21.7773 21.2773V26.7979C21.7773 27.8966 20.8868 28.7879 19.7881 28.7881C18.6892 28.7881 17.7979 27.8967 17.7979 26.7979V21.2773C17.7979 20.1785 18.6892 19.2871 19.7881 19.2871Z" stroke="#3279D3" strokeWidth="1.93616"/>
+  </svg>
+);
+
+/**
+ * Clock icon for session duration - represents time spent training
+ * Features a clock design in purple
+ */
+const ClockIcon = () => (
+  <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10" stroke="#8B5CF6"/>
+    <polyline points="12,6 12,12 16,14" stroke="#8B5CF6"/>
+  </svg>
+);
+
+/**
+ * Checkmark icon for modules played - represents completed modules
+ * Features a checkmark design in green
+ */
+const CheckmarkIcon = () => (
+  <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M20 6L9 17l-5-5" stroke="#10B981" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+/**
+ * Timer icon for module duration - represents training time per module
+ * Features a timer design in teal
+ */
+const TimerIcon = () => (
+  <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="10" y1="2" x2="14" y2="2" stroke="#14B8A6"/>
+    <line x1="12" y1="14" x2="12" y2="8" stroke="#14B8A6"/>
+    <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" stroke="#14B8A6"/>
+  </svg>
+);
+
 // Add CopilotIcon component near the other icon components
 const CopilotIcon = () => (
   <svg className="w-6 h-6 text-white mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -973,7 +1024,7 @@ export default function Home() {
           <div className="lg:col-span-1 grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="flex items-center gap-4 bg-gradient-to-r from-blue-100 to-blue-50 rounded-xl shadow hover:shadow-lg transition p-6">
               <div className="bg-blue-200 rounded-full p-2">
-                <CalendarIcon />
+                <HeadsetIcon />
               </div>
               <div>
                 <p className="text-3xl font-bold text-blue-900">{totalSessions}</p>
@@ -982,8 +1033,7 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-4 bg-gradient-to-r from-purple-100 to-purple-50 rounded-xl shadow hover:shadow-lg transition p-6">
               <div className="bg-purple-200 rounded-full p-2">
-                {/* DurationIcon removed in cleanup; using BarChartIcon as placeholder */}
-                <BarChartIcon />
+                <ClockIcon />
               </div>
               <div>
                 <p className="text-3xl font-bold text-purple-900">{avgSessionDuration.toFixed(1)}m</p>
@@ -993,7 +1043,7 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-4 bg-gradient-to-r from-green-100 to-green-50 rounded-xl shadow hover:shadow-lg transition p-6">
               <div className="bg-green-200 rounded-full p-2">
-                <CalendarIcon />
+                <CheckmarkIcon />
               </div>
               <div>
                 <p className="text-3xl font-bold text-green-900">{totalModulesPlayed}</p>
@@ -1003,8 +1053,7 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-4 bg-gradient-to-r from-teal-100 to-teal-50 rounded-xl shadow hover:shadow-lg transition p-6">
               <div className="bg-teal-200 rounded-full p-2">
-                {/* DurationIcon removed in cleanup; using BarChartIcon as placeholder */}
-                <BarChartIcon />
+                <TimerIcon />
               </div>
               <div>
                 <p className="text-3xl font-bold text-teal-900">{avgModuleDuration.toFixed(1)}m</p>
